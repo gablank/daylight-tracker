@@ -145,7 +145,7 @@
         onDateSelect={(date) => selectedDate = date}
       />
       <div class="flex flex-col gap-6 min-h-0">
-        <div class="flex-1 min-h-0 flex flex-col">
+        <div class="flex flex-col shrink-0">
           <DaylightChart 
             bind:derivativeCount
             {yearData} 
@@ -156,7 +156,7 @@
             onDateSelect={(date) => selectedDate = date}
           />
         </div>
-        <div class="flex-1 min-h-0 flex flex-col">
+        <div class="flex flex-col min-h-0 shrink-0">
           <SunPathChart {selectedDate} {latitude} {longitude} {timezone} />
         </div>
       </div>

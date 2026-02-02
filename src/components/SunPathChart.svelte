@@ -176,9 +176,9 @@
   }
 </script>
 
-<div class="h-full min-h-0 bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm flex flex-col">
-  <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Sun path</h3>
-  <div class="flex-1 min-h-0 flex items-center justify-center gap-4 flex-wrap items-start">
+<div class="min-h-0 bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm flex flex-col">
+  <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 shrink-0">Sun path</h3>
+  <div class="flex flex-wrap items-start justify-center gap-4 min-h-0">
     <!-- Polar sun path -->
     <div class="flex flex-col shrink-0 w-full max-w-[280px] overflow-visible">
       <p class="text-[10px] text-gray-500 dark:text-gray-400 mb-1 text-center min-h-[1.25rem] flex items-center justify-center">Direction and altitude</p>
@@ -297,7 +297,7 @@
       </svg>
     </div>
     <!-- Altitude chart -->
-    <div class="flex-1 min-w-[200px] max-w-[280px] flex flex-col min-w-0">
+    <div class="min-w-[200px] max-w-[280px] w-full flex flex-col shrink-0">
       <p class="text-[10px] text-gray-500 dark:text-gray-400 mb-1 text-center min-h-[1.25rem] flex items-center justify-center">Solar height (°)</p>
       <svg
         viewBox="0 0 {altChartWidth} {altChartHeight}"

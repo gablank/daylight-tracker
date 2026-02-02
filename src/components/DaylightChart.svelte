@@ -165,7 +165,7 @@
   }
 </script>
 
-<div class="h-full bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm flex flex-col">
+<div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm flex flex-col">
   <div class="flex items-center justify-between mb-3">
     <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">Daylight Through the Year</h3>
     <label class="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
@@ -183,7 +183,7 @@
       />
     </label>
   </div>
-  <div class="flex-1 min-h-0">
+  <div class="min-h-0">
   <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions a11y_no_noninteractive_element_interactions -->
   <svg
     viewBox="0 0 {width} {height}"
