@@ -92,35 +92,65 @@
     role="banner"
   >
     <div class="max-w-7xl mx-auto px-4 py-3">
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <div class="flex flex-wrap items-center gap-4 sm:gap-6">
+      <div class="flex flex-nowrap items-center justify-between gap-2 sm:gap-3 min-w-0">
+        <div class="flex flex-wrap items-center gap-2 sm:gap-4 md:gap-6 min-w-0 flex-1">
           <h1 class="text-lg font-bold text-gray-900 dark:text-gray-100 shrink-0">
             Daylight Tracker
           </h1>
           {#if sunData}
-            <div class="flex flex-wrap items-center gap-3 sm:gap-5 text-sm">
+            <div class="flex flex-wrap items-center gap-2 sm:gap-3 md:gap-5 text-sm min-w-0">
               <span class="font-medium text-gray-700 dark:text-gray-300 shrink-0">
                 {formatDateShort(selectedDate)}
               </span>
-              <span class="text-gray-500 dark:text-gray-400">
-                Sunrise
-                <span class="ml-1 font-medium text-gray-900 dark:text-gray-100">
+              <!-- Sunrise: icon below md, "Sunrise" label from md when there's room -->
+              <span
+                class="flex items-center gap-1 shrink-0"
+                title="Sunrise"
+                aria-label="Sunrise: {sunData.isPolarNight ? '—' : sunData.isPolarDay ? 'Always up' : formatTimeInTimezone(sunData.sunrise, timezone)}"
+              >
+                <span class="md:hidden text-gray-500 dark:text-gray-400" aria-hidden="true">
+                  <svg class="w-4 h-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+                  </svg>
+                </span>
+                <span class="hidden md:inline text-gray-500 dark:text-gray-400">Sunrise</span>
+                <span class="font-medium text-gray-900 dark:text-gray-100">
                   {#if sunData.isPolarNight}—
                   {:else if sunData.isPolarDay}Always up
                   {:else}{formatTimeInTimezone(sunData.sunrise, timezone)}{/if}
                 </span>
               </span>
-              <span class="text-gray-500 dark:text-gray-400">
-                Sunset
-                <span class="ml-1 font-medium text-gray-900 dark:text-gray-100">
+              <!-- Sunset: icon below md, "Sunset" label from md when there's room -->
+              <span
+                class="flex items-center gap-1 shrink-0"
+                title="Sunset"
+                aria-label="Sunset: {sunData.isPolarNight ? '—' : sunData.isPolarDay ? 'Never sets' : formatTimeInTimezone(sunData.sunset, timezone)}"
+              >
+                <span class="md:hidden text-gray-500 dark:text-gray-400" aria-hidden="true">
+                  <svg class="w-4 h-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </span>
+                <span class="hidden md:inline text-gray-500 dark:text-gray-400">Sunset</span>
+                <span class="font-medium text-gray-900 dark:text-gray-100">
                   {#if sunData.isPolarNight}—
                   {:else if sunData.isPolarDay}Never sets
                   {:else}{formatTimeInTimezone(sunData.sunset, timezone)}{/if}
                 </span>
               </span>
-              <span class="text-gray-500 dark:text-gray-400">
-                Daylight
-                <span class="ml-1 font-medium text-gray-900 dark:text-gray-100">
+              <!-- Daylight: icon below md, "Daylight" label from md when there's room -->
+              <span
+                class="flex items-center gap-1 shrink-0"
+                title="Daylight"
+                aria-label="Daylight: {sunData.isPolarNight ? '0h 0m' : sunData.isPolarDay ? '24h 0m' : formatDuration(sunData.daylight)}"
+              >
+                <span class="md:hidden text-gray-500 dark:text-gray-400" aria-hidden="true">
+                  <svg class="w-4 h-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                  </svg>
+                </span>
+                <span class="hidden md:inline text-gray-500 dark:text-gray-400">Daylight</span>
+                <span class="font-medium text-gray-900 dark:text-gray-100">
                   {#if sunData.isPolarNight}0h 0m
                   {:else if sunData.isPolarDay}24h 0m
                   {:else}{formatDuration(sunData.daylight)}{/if}
@@ -140,7 +170,7 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
-          <span>{settingsExpanded ? 'Close settings' : 'Settings'}</span>
+          <span class="hidden md:inline">{settingsExpanded ? 'Close settings' : 'Settings'}</span>
         </button>
       </div>
     </div>
