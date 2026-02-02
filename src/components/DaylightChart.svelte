@@ -6,7 +6,7 @@
 
   const width = 600;
   const height = 300;
-  const padding = { top: 20, right: 20, bottom: 40, left: 45 };
+  const padding = { top: 20, right: 52, bottom: 40, left: 45 };
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
 
@@ -24,6 +24,32 @@
         return `${i === 0 ? 'M' : 'L'} ${x} ${y}`;
       })
       .join(' ');
+  });
+
+  // Derivative: change in daylight per day (minutes per day)
+  let derivativeData = $derived.by(() => {
+    if (!yearData || yearData.length < 2) return { path: '', maxAbs: 1, ticks: [] };
+    const minutesPerDay = [];
+    for (let i = 1; i < yearData.length; i++) {
+      const changeMs = yearData[i].daylight - yearData[i - 1].daylight;
+      minutesPerDay.push(changeMs / (1000 * 60));
+    }
+    const maxAbs = Math.max(1, ...minutesPerDay.map((d) => Math.abs(d)));
+    const n = minutesPerDay.length;
+    const path = minutesPerDay
+      .map((deriv, i) => {
+        const x = padding.left + ((i + 0.5) / Math.max(n, 1)) * chartWidth;
+        const y = padding.top + chartHeight / 2 - (deriv / maxAbs) * (chartHeight / 2);
+        return `${i === 0 ? 'M' : 'L'} ${x} ${y}`;
+      })
+      .join(' ');
+    const tickStep = maxAbs <= 2 ? 0.5 : maxAbs <= 5 ? 1 : maxAbs <= 10 ? 2 : Math.ceil(maxAbs / 5);
+    const ticks = [];
+    for (let t = -maxAbs; t <= maxAbs + 0.01; t += tickStep) {
+      ticks.push(Math.round(t * 10) / 10);
+    }
+    if (ticks.length === 0) ticks.push(0);
+    return { path, maxAbs, ticks };
   });
 
   // Area fill (line + bottom edge)
@@ -105,7 +131,7 @@
       </linearGradient>
     </defs>
 
-    <!-- Y-axis: hour ticks and labels -->
+    <!-- Left Y-axis: hour ticks and labels -->
     {#each [0, 6, 12, 18, 24] as hours}
       {@const y = padding.top + chartHeight - (hours / 24) * chartHeight}
       <line
@@ -126,6 +152,38 @@
         {hours}h
       </text>
     {/each}
+
+    <!-- Zero line for derivative (horizontal at middle) -->
+    <line
+      x1={padding.left}
+      y1={padding.top + chartHeight / 2}
+      x2={width - padding.right}
+      y2={padding.top + chartHeight / 2}
+      stroke="rgb(16, 185, 129)"
+      stroke-opacity="0.3"
+      stroke-dasharray="4,4"
+    />
+
+    <!-- Right Y-axis: derivative (min/day) ticks and labels -->
+    {#each derivativeData.ticks as tick}
+      {@const y = padding.top + chartHeight / 2 - (tick / derivativeData.maxAbs) * (chartHeight / 2)}
+      <text
+        x={width - padding.right + 8}
+        y={y + 4}
+        text-anchor="start"
+        class="fill-emerald-600 dark:fill-emerald-400 text-xs"
+      >
+        {tick >= 0 ? '+' : ''}{tick}
+      </text>
+    {/each}
+    <text
+      x={width - padding.right - 4}
+      y={padding.top - 4}
+      text-anchor="end"
+      class="fill-emerald-600 dark:fill-emerald-400 text-[10px]"
+    >
+      Δ min/day
+    </text>
 
     <!-- X-axis: month ticks and labels -->
     {#each monthTicks as { x, label }}
@@ -162,6 +220,19 @@
       stroke-linecap="round"
       stroke-linejoin="round"
     />
+
+    <!-- Derivative line (change per day, right y-axis) -->
+    {#if derivativeData.path}
+      <path
+        d={derivativeData.path}
+        fill="none"
+        stroke="rgb(16, 185, 129)"
+        stroke-width="1.5"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-opacity="0.9"
+      />
+    {/if}
 
     <!-- Selected date vertical line -->
     {#if selectedDateX !== null}
