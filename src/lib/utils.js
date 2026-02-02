@@ -186,6 +186,19 @@ export function formatDurationChange(ms) {
 }
 
 /**
+ * Format a duration change with minutes and seconds (e.g. "+2m 30s", "-1m 15s")
+ * @param {number} ms - Duration change in milliseconds
+ * @returns {string} Formatted string like "+2m 30s" or "-1m 15s"
+ */
+export function formatDurationChangeMinutesSeconds(ms) {
+  const sign = ms >= 0 ? '+' : '-';
+  const absMs = Math.abs(ms);
+  const minutes = Math.floor(absMs / (1000 * 60));
+  const seconds = Math.floor((absMs % (1000 * 60)) / 1000);
+  return `${sign}${minutes}m ${seconds}s`;
+}
+
+/**
  * Format a time in a specific timezone
  * @param {Date} date - The date/time to format
  * @param {string} timezone - The IANA timezone name

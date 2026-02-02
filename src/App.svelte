@@ -6,6 +6,7 @@
   import DatePicker from './components/DatePicker.svelte';
   import TodaySun from './components/TodaySun.svelte';
   import YearGraph from './components/YearGraph.svelte';
+  import DaylightChart from './components/DaylightChart.svelte';
   import StatsTable from './components/StatsTable.svelte';
   import UpcomingDates from './components/UpcomingDates.svelte';
   
@@ -106,13 +107,18 @@
         </div>
       </div>
       
-      <!-- Right column: Year Graph (2/3 width) -->
+      <!-- Right column: Year Graph + Linear Chart (2/3 width) -->
       <div class="lg:col-span-2">
         <YearGraph 
           {selectedDate} 
           {yearData} 
           {oppositeDate} 
           {latitude} 
+          onDateSelect={(date) => selectedDate = date}
+        />
+        <DaylightChart 
+          {yearData} 
+          {selectedDate} 
           onDateSelect={(date) => selectedDate = date}
         />
       </div>
