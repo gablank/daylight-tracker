@@ -230,3 +230,61 @@ export function formatTimeInTimezone(date, timezone) {
 export function getLocalTimezone() {
   return Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
+
+/**
+ * Get calendar day (year, month, day) of a date in a specific timezone
+ * @param {Date} date
+ * @param {string} timezone - IANA timezone name
+ * @returns {{ year: number, month: number, day: number }} month 1-12, day 1-31
+ */
+export function getCalendarDayInTimezone(date, timezone) {
+  const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' });
+  const parts = formatter.formatToParts(date);
+  const get = (type) => parseInt(parts.find((p) => p.type === type).value, 10);
+  return { year: get('year'), month: get('month'), day: get('day') };
+}
+
+/**
+ * Get fractional hour (0-24) of a date in a specific timezone, as elapsed time since midnight in that zone.
+ * Uses actual UTC difference so DST is correct (avoids Intl format quirks that can cause ~1h shift).
+ * @param {Date} date
+ * @param {string} timezone - IANA timezone name
+ * @returns {number}
+ */
+export function getHourInTimezone(date, timezone) {
+  const { year, month, day } = getCalendarDayInTimezone(date, timezone);
+  const midnight = dateAtLocalInTimezone(year, month, day, 0, 0, timezone);
+  return (date.getTime() - midnight.getTime()) / 3600000;
+}
+
+/**
+ * Create a Date for a given local (year, month, day, hour, min) in a timezone
+ * @param {number} year
+ * @param {number} month - 1-12
+ * @param {number} day
+ * @param {number} hour
+ * @param {number} min
+ * @param {string} timezone - IANA timezone name
+ * @returns {Date}
+ */
+export function dateAtLocalInTimezone(year, month, day, hour, min, timezone) {
+  const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+  // Find midnight on (year, month, day) in timezone first; start from noon UTC that day
+  let M = Date.UTC(year, month - 1, day, 12, 0, 0);
+  for (let i = 0; i < 15; i++) {
+    const parts = formatter.formatToParts(M);
+    const get = (type) => parseInt(parts.find((p) => p.type === type)?.value ?? '0', 10);
+    const y0 = get('year'), m0 = get('month'), d0 = get('day'), h0 = get('hour'), min0 = get('minute');
+    if (y0 === year && m0 === month && d0 === day && h0 === 0 && min0 === 0) {
+      return new Date(M + hour * 3600000 + min * 60000);
+    }
+    if (y0 === year && m0 === month && d0 === day) {
+      M -= h0 * 3600000 + min0 * 60000;
+    } else if (y0 < year || (y0 === year && m0 < month) || (y0 === year && m0 === month && d0 < day)) {
+      M += 24 * 3600000;
+    } else {
+      M -= 24 * 3600000;
+    }
+  }
+  return new Date(M + hour * 3600000 + min * 60000);
+}

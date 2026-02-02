@@ -107,14 +107,23 @@
     return padding.left + ((doy - 1) / Math.max(daysInYear - 1, 1)) * chartWidth;
   });
 
-  // Daylight change from previous day (for label)
+  // Rate of change at selected day: centered difference (tomorrow - yesterday)/2 so solstice shows ~0
   let daylightChangeLabel = $derived.by(() => {
     if (!selectedDate || !yearData || yearData.length === 0) return null;
     const doy = getDayOfYear(selectedDate);
-    const todayData = yearData[doy - 1];
+    const daysInYear = yearData.length;
     const prevData = doy > 1 ? yearData[doy - 2] : null;
-    if (!todayData || !prevData) return null;
-    const changeMs = todayData.daylight - prevData.daylight;
+    const nextData = doy < daysInYear ? yearData[doy] : null;
+    let changeMs;
+    if (prevData && nextData) {
+      changeMs = (nextData.daylight - prevData.daylight) / 2;
+    } else if (nextData) {
+      changeMs = nextData.daylight - yearData[doy - 1].daylight;
+    } else if (prevData) {
+      changeMs = yearData[doy - 1].daylight - prevData.daylight;
+    } else {
+      return null;
+    }
     return formatDurationChangeMinutesSeconds(changeMs);
   });
 
@@ -136,7 +145,7 @@
   }
 </script>
 
-<div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm mt-4">
+<div class="h-full bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm flex flex-col">
   <div class="flex items-center justify-between mb-3">
     <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">Daylight Through the Year</h3>
     <label class="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
@@ -154,6 +163,7 @@
       />
     </label>
   </div>
+  <div class="flex-1 min-h-0">
   <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_noninteractive_element_interactions -->
   <svg
     viewBox="0 0 {width} {height}"
@@ -293,7 +303,7 @@
         stroke-width="2"
         stroke-opacity="0.9"
       />
-      <!-- Label: change from previous day -->
+      <!-- Label: rate of change at this day (centered difference) -->
       {#if daylightChangeLabel !== null}
         <text
           x={selectedDateX}
@@ -306,4 +316,5 @@
       {/if}
     {/if}
   </svg>
+  </div>
 </div>

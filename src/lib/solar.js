@@ -1,4 +1,5 @@
 import SunCalc from 'suncalc';
+import { getCalendarDayInTimezone, dateAtLocalInTimezone } from './utils.js';
 
 /**
  * Check if a year is a leap year
@@ -51,7 +52,10 @@ export function getSummerSolstice(year) {
  * @returns {Object} Sun data including sunrise, sunset, daylight duration, etc.
  */
 export function getSunData(date, latitude, longitude = 0) {
-  const times = SunCalc.getTimes(date, latitude, longitude);
+  // Use noon local for the calendar day so SunCalc (UTC-based) gets the correct day;
+  // midnight local can be the previous UTC day in positive-offset timezones.
+  const noon = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0);
+  const times = SunCalc.getTimes(noon, latitude, longitude);
   
   const sunrise = times.sunrise;
   const sunset = times.sunset;
@@ -96,6 +100,48 @@ export function getSunData(date, latitude, longitude = 0) {
 }
 
 /**
+ * Get sun position (altitude and azimuth) at a specific time
+ * @param {Date} date - The date/time
+ * @param {number} latitude - Latitude
+ * @param {number} longitude - Longitude
+ * @returns {{altitude: number, azimuth: number}} altitude and azimuth in degrees
+ */
+export function getSunPosition(date, latitude, longitude = 0) {
+  const pos = SunCalc.getPosition(date, latitude, longitude);
+  let azimuth = pos.azimuth * 180 / Math.PI;
+  if (azimuth < 0) azimuth += 360;
+  return {
+    altitude: pos.altitude * 180 / Math.PI,
+    azimuth
+  };
+}
+
+/**
+ * Get sun path (altitude and azimuth) for each 5 minutes on a given date
+ * @param {Date} date - The date
+ * @param {number} latitude - Latitude
+ * @param {number} longitude - Longitude
+ * @param {string} [timezone] - IANA timezone; if provided, times are for midnight–midnight in this zone (avoids 1h offset vs polar markers)
+ * @returns {Array<{time: Date, altitude: number, azimuth: number}>} altitude/azimuth in degrees
+ */
+export function getSunPathForDay(date, latitude, longitude = 0, timezone = null) {
+  const cal = timezone ? getCalendarDayInTimezone(date, timezone) : { year: date.getFullYear(), month: date.getMonth() + 1, day: date.getDate() };
+  const { year, month, day } = cal;
+  const points = [];
+  for (let hour = 0; hour < 24; hour++) {
+    for (let min = 0; min < 60; min += 5) {
+      const d = timezone ? dateAtLocalInTimezone(year, month, day, hour, min, timezone) : new Date(year, month - 1, day, hour, min, 0);
+      const pos = SunCalc.getPosition(d, latitude, longitude);
+      const altitude = pos.altitude * 180 / Math.PI;
+      let azimuth = pos.azimuth * 180 / Math.PI;
+      if (azimuth < 0) azimuth += 360;
+      points.push({ time: d, altitude, azimuth });
+    }
+  }
+  return points;
+}
+
+/**
  * Compute sun data for all days in a year
  * @param {number} latitude - The latitude (-90 to 90)
  * @param {number} year - The year to compute
@@ -104,13 +150,11 @@ export function getSunData(date, latitude, longitude = 0) {
 export function computeYearData(latitude, year) {
   const daysInYear = getDaysInYear(year);
   const data = [];
-  
   for (let dayOfYear = 1; dayOfYear <= daysInYear; dayOfYear++) {
     const date = new Date(year, 0, dayOfYear);
     const sunData = getSunData(date, latitude);
     data.push(sunData);
   }
-  
   return data;
 }
 

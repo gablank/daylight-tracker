@@ -226,7 +226,7 @@
   });
 </script>
 
-<div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
+<div class="h-full bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm flex flex-col">
   <div class="flex items-center justify-between mb-3">
     <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">Year Overview</h3>
     
@@ -242,7 +242,7 @@
     </label>
   </div>
   
-  <div class="flex justify-center">
+  <div class="flex flex-1 min-h-0 justify-center">
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <svg 
       viewBox="0 0 {size} {size}" 
@@ -296,39 +296,46 @@
         </text>
       {/each}
       
-      <!-- Solstice and Equinox markers -->
+      <!-- Solstice and Equinox markers (clickable to select that date) -->
       {#each astronomicalMarkers as marker}
-        <!-- Diamond marker -->
-        <g transform="translate({marker.markerPos.x}, {marker.markerPos.y})">
-          <rect 
-            x="-6" y="-6" 
-            width="12" height="12" 
-            transform="rotate(45)"
-            class="{marker.name.includes('Solstice') ? 'fill-amber-500' : 'fill-emerald-500'}"
-            rx="1"
-          />
-        </g>
-        
-        <!-- Label with date (March equinox offset down to avoid March label) -->
         {@const yOffset = marker.id === 'mar-equinox' ? 30 : 0}
-        <text
-          x={marker.labelPos.x}
-          y={marker.labelPos.y - 8 + yOffset}
-          text-anchor="middle"
-          class="fill-gray-700 dark:fill-gray-300 font-semibold"
-          font-size="13"
+        <g
+          role="button"
+          tabindex="0"
+          class="cursor-pointer hover:opacity-80 outline-none focus:outline-none focus:ring-0"
+          onclick={(e) => { e.stopPropagation(); onDateSelect?.(marker.date); }}
+          onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onDateSelect?.(marker.date); } }}
+          title="Select {marker.name} ({marker.dateStr})"
         >
-          {marker.name}
-        </text>
-        <text
-          x={marker.labelPos.x}
-          y={marker.labelPos.y + 8 + yOffset}
-          text-anchor="middle"
-          class="fill-gray-500 dark:fill-gray-400"
-          font-size="12"
-        >
-          {marker.dateStr}
-        </text>
+          <!-- Diamond marker -->
+          <g transform="translate({marker.markerPos.x}, {marker.markerPos.y})">
+            <rect 
+              x="-6" y="-6" 
+              width="12" height="12" 
+              transform="rotate(45)"
+              class="{marker.name.includes('Solstice') ? 'fill-amber-500' : 'fill-emerald-500'}"
+              rx="1"
+            />
+          </g>
+          <text
+            x={marker.labelPos.x}
+            y={marker.labelPos.y - 8 + yOffset}
+            text-anchor="middle"
+            class="fill-gray-700 dark:fill-gray-300 font-semibold"
+            font-size="13"
+          >
+            {marker.name}
+          </text>
+          <text
+            x={marker.labelPos.x}
+            y={marker.labelPos.y + 8 + yOffset}
+            text-anchor="middle"
+            class="fill-gray-500 dark:fill-gray-400"
+            font-size="12"
+          >
+            {marker.dateStr}
+          </text>
+        </g>
       {/each}
       
       <!-- Opposite date marker -->

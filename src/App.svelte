@@ -7,6 +7,7 @@
   import TodaySun from './components/TodaySun.svelte';
   import YearGraph from './components/YearGraph.svelte';
   import DaylightChart from './components/DaylightChart.svelte';
+  import SunPathChart from './components/SunPathChart.svelte';
   import StatsTable from './components/StatsTable.svelte';
   import UpcomingDates from './components/UpcomingDates.svelte';
   
@@ -18,6 +19,7 @@
   let timezone = $state('Europe/Oslo');
   let selectedDate = $state(getToday());
   let derivativeCount = $state(1);
+  let settingsExpanded = $state(true);
   let settingsLoaded = $state(false);
   
   // Load settings from localStorage on mount (selectedDate always defaults to today)
@@ -32,6 +34,7 @@
         if (settings.longitude !== undefined) longitude = settings.longitude;
         if (settings.timezone) timezone = settings.timezone;
         if (settings.derivativeCount !== undefined) derivativeCount = Math.max(1, Math.min(5, settings.derivativeCount));
+        if (settings.settingsExpanded !== undefined) settingsExpanded = settings.settingsExpanded;
         // Note: selectedDate is NOT restored - always use current date on page load
         settingsLoaded = true;
       } catch {
@@ -65,7 +68,8 @@
       latitude,
       longitude,
       timezone,
-      derivativeCount
+      derivativeCount,
+      settingsExpanded
     }));
   });
   
@@ -99,32 +103,57 @@
       <TodaySun {sunData} {timezone} />
     </div>
     
-    <!-- Top section: Controls (1/3) + Graph (2/3) -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-      <!-- Left column: Combined Location & Date -->
-      <div class="lg:col-span-1">
-        <div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm space-y-4">
-          <LatitudeSelector bind:latitude bind:longitude bind:timezone />
-          <hr class="border-gray-200 dark:border-gray-700" />
-          <DatePicker bind:selectedDate />
-        </div>
+    <!-- Settings (full width, collapsible, below Sun today) -->
+    <div class="mb-6">
+      <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
+        <button
+          type="button"
+          class="w-full flex items-center justify-between gap-2 px-4 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+          onclick={() => settingsExpanded = !settingsExpanded}
+          aria-expanded={settingsExpanded}
+        >
+          <span>Location & date</span>
+          <svg
+            class="w-5 h-5 shrink-0 transition-transform {settingsExpanded ? 'rotate-180' : ''}"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        {#if settingsExpanded}
+          <div class="border-t border-gray-200 dark:border-gray-700 p-4 space-y-4">
+            <LatitudeSelector bind:latitude bind:longitude bind:timezone />
+            <hr class="border-gray-200 dark:border-gray-700" />
+            <DatePicker bind:selectedDate />
+          </div>
+        {/if}
       </div>
-      
-      <!-- Right column: Year Graph + Linear Chart (2/3 width) -->
-      <div class="lg:col-span-2">
-        <YearGraph 
-          {selectedDate} 
-          {yearData} 
-          {oppositeDate} 
-          {latitude} 
-          onDateSelect={(date) => selectedDate = date}
-        />
-        <DaylightChart 
-          bind:derivativeCount
-          {yearData} 
-          {selectedDate} 
-          onDateSelect={(date) => selectedDate = date}
-        />
+    </div>
+    
+    <!-- Year overview (left, full height) | Daylight chart + Sun path (right, stacked 50/50) -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6 min-h-[520px]">
+      <YearGraph 
+        {selectedDate} 
+        {yearData} 
+        {oppositeDate} 
+        {latitude} 
+        onDateSelect={(date) => selectedDate = date}
+      />
+      <div class="flex flex-col gap-6 min-h-0">
+        <div class="flex-1 min-h-0 flex flex-col">
+          <DaylightChart 
+            bind:derivativeCount
+            {yearData} 
+            {selectedDate} 
+            onDateSelect={(date) => selectedDate = date}
+          />
+        </div>
+        <div class="flex-1 min-h-0 flex flex-col">
+          <SunPathChart {selectedDate} {latitude} {longitude} {timezone} />
+        </div>
       </div>
     </div>
     
