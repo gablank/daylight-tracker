@@ -75,11 +75,12 @@
         })
         .join(' ');
       const tickStep = maxAbs <= 0.5 ? 0.1 : maxAbs <= 2 ? 0.5 : maxAbs <= 5 ? 1 : Math.ceil(maxAbs / 5);
-      const ticks = [];
-      for (let t = -maxAbs; t <= maxAbs + 0.01; t += tickStep) {
+      // Generate ticks symmetrically from 0 so 0 is always included
+      const ticks = [0];
+      for (let t = tickStep; t <= maxAbs + 0.01; t += tickStep) {
         ticks.push(Math.round(t * 100) / 100);
+        ticks.unshift(Math.round(-t * 100) / 100);
       }
-      if (ticks.length === 0) ticks.push(0);
       result.push({ path, maxAbs, ticks, order });
     }
     return result;
@@ -271,13 +272,13 @@
         </text>
       {/each}
       <text
-        x={axisX - 4}
+        x={axisX + 8}
         y={padding.top - 4}
-        text-anchor="end"
+        text-anchor="start"
         class="text-[10px]"
         style="fill: {derivativeColors[idx]}"
       >
-        {deriv.order === 1 ? 'Δ min/day' : `Δ${deriv.order}`}
+        Δ{deriv.order}
       </text>
     {/each}
 
