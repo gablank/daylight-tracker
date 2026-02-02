@@ -1,5 +1,5 @@
 <script>
-  import { PRESET_LOCATIONS, TIMEZONE_GROUPS, getLocalTimezone } from '../lib/utils.js';
+  import { PRESET_LOCATION_GROUPS, PRESET_LOCATIONS, TIMEZONE_GROUPS, getLocalTimezone } from '../lib/utils.js';
   
   let { 
     latitude = $bindable(59.9), 
@@ -34,7 +34,7 @@
     const preset = PRESET_LOCATIONS.find(p => p.name === value);
     if (preset) {
       latitude = preset.latitude;
-      longitude = preset.longitude;
+      longitude = preset.longitude ?? 0;
       timezone = preset.timezone;
       onchange?.({ latitude, longitude, timezone });
     }
@@ -86,11 +86,11 @@
     }
   }
   
-  // Find current preset (if any)
+  // Find current preset (if any); latitudeOnly presets match by latitude only
   let currentPreset = $derived(
-    PRESET_LOCATIONS.find(p => 
-      Math.abs(p.latitude - latitude) < 0.1 && 
-      Math.abs(p.longitude - longitude) < 0.1
+    PRESET_LOCATIONS.find(p =>
+      Math.abs(p.latitude - latitude) < 0.1 &&
+      (p.latitudeOnly || Math.abs((p.longitude ?? 0) - longitude) < 0.1)
     )?.name || ''
   );
 </script>
@@ -149,10 +149,14 @@
                focus:outline-none focus:ring-2 focus:ring-blue-500"
       >
         <option value="">Select a location...</option>
-        {#each PRESET_LOCATIONS as preset}
-          <option value={preset.name}>
-            {preset.name} ({preset.latitude > 0 ? '+' : ''}{preset.latitude}°)
-          </option>
+        {#each PRESET_LOCATION_GROUPS as group}
+          <optgroup label={group.label}>
+            {#each group.locations as preset}
+              <option value={preset.name}>
+                {preset.name} ({preset.latitude > 0 ? '+' : ''}{preset.latitude}°)
+              </option>
+            {/each}
+          </optgroup>
         {/each}
       </select>
     </div>

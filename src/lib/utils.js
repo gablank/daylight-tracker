@@ -67,36 +67,91 @@ export function getToday() {
 }
 
 /**
- * Preset locations with their latitudes, longitudes, and timezones
+ * Preset location: name, latitude, longitude (0 if latitudeOnly), timezone, optional latitudeOnly
+ * @typedef {{ name: string, latitude: number, longitude: number, timezone: string, latitudeOnly?: boolean }} PresetLocation
  */
-export const PRESET_LOCATIONS = [
-  { name: 'Equator (Pacific)', latitude: 0, longitude: -90, timezone: 'Pacific/Galapagos' },
-  { name: 'Tropic of Cancer (India)', latitude: 23.4, longitude: 77, timezone: 'Asia/Kolkata' },
-  { name: 'Tropic of Capricorn (Brazil)', latitude: -23.4, longitude: -46, timezone: 'America/Sao_Paulo' },
-  { name: 'Oslo, Norway', latitude: 59.9, longitude: 10.7, timezone: 'Europe/Oslo' },
-  { name: 'Tromsø, Norway', latitude: 69.7, longitude: 19.0, timezone: 'Europe/Oslo' },
-  { name: 'Longyearbyen, Svalbard', latitude: 78.2, longitude: 15.6, timezone: 'Arctic/Longyearbyen' },
-  { name: 'Stockholm, Sweden', latitude: 59.3, longitude: 18.1, timezone: 'Europe/Stockholm' },
-  { name: 'Helsinki, Finland', latitude: 60.2, longitude: 24.9, timezone: 'Europe/Helsinki' },
-  { name: 'Reykjavik, Iceland', latitude: 64.1, longitude: -21.9, timezone: 'Atlantic/Reykjavik' },
-  { name: 'London, UK', latitude: 51.5, longitude: -0.1, timezone: 'Europe/London' },
-  { name: 'Paris, France', latitude: 48.9, longitude: 2.3, timezone: 'Europe/Paris' },
-  { name: 'Berlin, Germany', latitude: 52.5, longitude: 13.4, timezone: 'Europe/Berlin' },
-  { name: 'Moscow, Russia', latitude: 55.8, longitude: 37.6, timezone: 'Europe/Moscow' },
-  { name: 'New York, USA', latitude: 40.7, longitude: -74.0, timezone: 'America/New_York' },
-  { name: 'Los Angeles, USA', latitude: 34.1, longitude: -118.2, timezone: 'America/Los_Angeles' },
-  { name: 'Chicago, USA', latitude: 41.9, longitude: -87.6, timezone: 'America/Chicago' },
-  { name: 'Anchorage, USA', latitude: 61.2, longitude: -149.9, timezone: 'America/Anchorage' },
-  { name: 'Tokyo, Japan', latitude: 35.7, longitude: 139.7, timezone: 'Asia/Tokyo' },
-  { name: 'Sydney, Australia', latitude: -33.9, longitude: 151.2, timezone: 'Australia/Sydney' },
-  { name: 'Auckland, New Zealand', latitude: -36.8, longitude: 174.8, timezone: 'Pacific/Auckland' },
-  { name: 'Cape Town, South Africa', latitude: -33.9, longitude: 18.4, timezone: 'Africa/Johannesburg' },
-  { name: 'Buenos Aires, Argentina', latitude: -34.6, longitude: -58.4, timezone: 'America/Argentina/Buenos_Aires' },
-  { name: 'Arctic Circle (Norway)', latitude: 66.5, longitude: 15.0, timezone: 'Europe/Oslo' },
-  { name: 'Antarctic Circle', latitude: -66.5, longitude: 110.5, timezone: 'Antarctica/Casey' },
-  { name: 'North Pole', latitude: 90, longitude: 0, timezone: 'UTC' },
-  { name: 'South Pole', latitude: -90, longitude: 0, timezone: 'Antarctica/South_Pole' },
+
+/**
+ * Preset locations grouped by continent. Non-continent-specific (Equator, circles, poles) go in Other.
+ * "Other" entries use longitude 0 and latitudeOnly: true (display shows latitude only).
+ */
+export const PRESET_LOCATION_GROUPS = [
+  {
+    label: 'Europe',
+    locations: [
+      { name: 'Longyearbyen, Svalbard', latitude: 78.2, longitude: 15.6, timezone: 'Arctic/Longyearbyen' },
+      { name: 'Tromsø, Norway', latitude: 69.7, longitude: 19.0, timezone: 'Europe/Oslo' },
+      { name: 'Reykjavik, Iceland', latitude: 64.1, longitude: -21.9, timezone: 'Atlantic/Reykjavik' },
+      { name: 'Oslo, Norway', latitude: 59.9, longitude: 10.7, timezone: 'Europe/Oslo' },
+      { name: 'Berlin, Germany', latitude: 52.5, longitude: 13.4, timezone: 'Europe/Berlin' },
+      { name: 'London, UK', latitude: 51.5, longitude: -0.1, timezone: 'Europe/London' },
+      { name: 'Madrid, Spain', latitude: 40.4, longitude: -3.7, timezone: 'Europe/Madrid' },
+      { name: 'Athens, Greece', latitude: 37.9, longitude: 23.7, timezone: 'Europe/Athens' },
+    ]
+  },
+  {
+    label: 'Americas',
+    locations: [
+      { name: 'Anchorage, USA', latitude: 61.2, longitude: -149.9, timezone: 'America/Anchorage' },
+      { name: 'Seattle, USA', latitude: 47.6, longitude: -122.3, timezone: 'America/Los_Angeles' },
+      { name: 'Denver, USA', latitude: 39.7, longitude: -104.9, timezone: 'America/Denver' },
+      { name: 'Miami, USA', latitude: 25.8, longitude: -80.2, timezone: 'America/New_York' },
+      { name: 'Mexico City, Mexico', latitude: 19.4, longitude: -99.1, timezone: 'America/Mexico_City' },
+      { name: 'Lima, Peru', latitude: -12.0, longitude: -77.0, timezone: 'America/Lima' },
+      { name: 'Rio de Janeiro, Brazil', latitude: -22.9, longitude: -43.2, timezone: 'America/Sao_Paulo' },
+      { name: 'Buenos Aires, Argentina', latitude: -34.6, longitude: -58.4, timezone: 'America/Argentina/Buenos_Aires' },
+      { name: 'Ushuaia, Argentina', latitude: -54.8, longitude: -68.3, timezone: 'America/Argentina/Ushuaia' },
+    ]
+  },
+  {
+    label: 'Asia',
+    locations: [
+      { name: 'Yakutsk, Russia', latitude: 62.0, longitude: 129.7, timezone: 'Asia/Yakutsk' },
+      { name: 'Seoul, South Korea', latitude: 37.6, longitude: 127.0, timezone: 'Asia/Seoul' },
+      { name: 'Tokyo, Japan', latitude: 35.7, longitude: 139.7, timezone: 'Asia/Tokyo' },
+      { name: 'Mumbai, India', latitude: 19.1, longitude: 72.9, timezone: 'Asia/Kolkata' },
+      { name: 'Bangkok, Thailand', latitude: 13.8, longitude: 100.5, timezone: 'Asia/Bangkok' },
+      { name: 'Singapore', latitude: 1.3, longitude: 103.8, timezone: 'Asia/Singapore' },
+    ]
+  },
+  {
+    label: 'Africa',
+    locations: [
+      { name: 'Cairo, Egypt', latitude: 30.0, longitude: 31.2, timezone: 'Africa/Cairo' },
+      { name: 'Lagos, Nigeria', latitude: 6.5, longitude: 3.4, timezone: 'Africa/Lagos' },
+      { name: 'Nairobi, Kenya', latitude: -1.3, longitude: 36.8, timezone: 'Africa/Nairobi' },
+      { name: 'Johannesburg, South Africa', latitude: -26.2, longitude: 28.0, timezone: 'Africa/Johannesburg' },
+      { name: 'Cape Town, South Africa', latitude: -33.9, longitude: 18.4, timezone: 'Africa/Johannesburg' },
+    ]
+  },
+  {
+    label: 'Oceania',
+    locations: [
+      { name: 'Port Moresby, Papua New Guinea', latitude: -9.5, longitude: 147.2, timezone: 'Pacific/Port_Moresby' },
+      { name: 'Darwin, Australia', latitude: -12.5, longitude: 130.8, timezone: 'Australia/Darwin' },
+      { name: 'Brisbane, Australia', latitude: -27.5, longitude: 153.0, timezone: 'Australia/Brisbane' },
+      { name: 'Sydney, Australia', latitude: -33.9, longitude: 151.2, timezone: 'Australia/Sydney' },
+      { name: 'Auckland, New Zealand', latitude: -36.8, longitude: 174.8, timezone: 'Pacific/Auckland' },
+      { name: 'Melbourne, Australia', latitude: -37.8, longitude: 144.9, timezone: 'Australia/Melbourne' },
+      { name: 'Hobart, Australia', latitude: -42.9, longitude: 147.3, timezone: 'Australia/Hobart' },
+    ]
+  },
+  {
+    label: 'Other',
+    locations: [
+      { name: 'Equator', latitude: 0, longitude: 0, timezone: 'UTC', latitudeOnly: true },
+      { name: 'Tropic of Cancer', latitude: 23.4, longitude: 0, timezone: 'UTC', latitudeOnly: true },
+      { name: 'Tropic of Capricorn', latitude: -23.4, longitude: 0, timezone: 'UTC', latitudeOnly: true },
+      { name: 'Arctic Circle', latitude: 66.5, longitude: 0, timezone: 'UTC', latitudeOnly: true },
+      { name: 'Antarctic Circle', latitude: -66.5, longitude: 0, timezone: 'UTC', latitudeOnly: true },
+      { name: 'North Pole', latitude: 90, longitude: 0, timezone: 'UTC', latitudeOnly: true },
+      { name: 'South Pole', latitude: -90, longitude: 0, timezone: 'Antarctica/South_Pole', latitudeOnly: true },
+    ]
+  },
 ];
+
+/** Flat list of all preset locations (for lookup by name) */
+export const PRESET_LOCATIONS = PRESET_LOCATION_GROUPS.flatMap((g) => g.locations);
 
 /**
  * Common timezones grouped by region
