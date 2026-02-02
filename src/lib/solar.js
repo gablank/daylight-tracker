@@ -1,5 +1,5 @@
 import SunCalc from 'suncalc';
-import { getCalendarDayInTimezone, dateAtLocalInTimezone } from './utils.js';
+import { getCalendarDayInTimezone, dateAtLocalInTimezone, formatTimeInTimezone } from './utils.js';
 
 /**
  * Check if a year is a leap year
@@ -342,6 +342,37 @@ export function formatDateShort(date) {
                   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   
   return `${months[date.getMonth()]} ${date.getDate()}`;
+}
+
+/**
+ * Get day stats for tooltip (date label, sunrise, sunset, daylight; handles polar day/night).
+ * @param {Date} date
+ * @param {number} latitude
+ * @param {number} longitude
+ * @param {string} [timezone] - IANA timezone for formatting times; if omitted uses formatTime (local)
+ * @returns {{ dateLabel: string, sunrise: string, sunset: string, daylight: string, isPolarDay: boolean, isPolarNight: boolean }}
+ */
+export function getDayStatsForTooltip(date, latitude, longitude, timezone = null) {
+  if (!date) return { dateLabel: '--', sunrise: '--', sunset: '--', daylight: '--', isPolarDay: false, isPolarNight: false };
+  const data = getSunData(date, latitude, longitude);
+  const dateLabel = formatDateShort(date);
+  const fmtTime = timezone
+    ? (d) => formatTimeInTimezone(d, timezone)
+    : (d) => (d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0'));
+  let sunrise = '--';
+  let sunset = '--';
+  if (data.isPolarDay) {
+    sunrise = 'Polar day';
+    sunset = 'Polar day';
+  } else if (data.isPolarNight) {
+    sunrise = 'Polar night';
+    sunset = 'Polar night';
+  } else {
+    if (data.sunrise) sunrise = fmtTime(data.sunrise);
+    if (data.sunset) sunset = fmtTime(data.sunset);
+  }
+  const daylight = formatDuration(data.daylight ?? 0);
+  return { dateLabel, sunrise, sunset, daylight, isPolarDay: data.isPolarDay, isPolarNight: data.isPolarNight };
 }
 
 /**

@@ -1,7 +1,12 @@
 <script>
-  import { getDateAngle, formatDateShort, formatDuration, getDaysInYear, getWinterSolstice, getDayOfYear, getSeasonName } from '../lib/solar.js';
+  import { getDateAngle, formatDateShort, formatDuration, getDaysInYear, getWinterSolstice, getDayOfYear, getSeasonName, getDayStatsForTooltip } from '../lib/solar.js';
   
-  let { selectedDate, yearData, oppositeDate, latitude = 0, onDateSelect = null } = $props();
+  let { selectedDate, yearData, oppositeDate, latitude = 0, longitude = 0, timezone = null, onDateSelect = null } = $props();
+  
+  // Hover tooltip: date under cursor and screen position
+  let hoveredDate = $state(null);
+  let tooltipX = $state(0);
+  let tooltipY = $state(0);
   
   // SVG dimensions - increased to accommodate labels
   const size = 480;
@@ -9,41 +14,46 @@
   const outerRadius = 160;
   const innerRadius = 95;
   
-  // Handle click on the ring to select a date
-  function handleRingClick(event) {
-    if (!onDateSelect || !selectedDate) return;
-    
-    // Get click position relative to SVG center
-    const svg = event.currentTarget;
+  // Get date at SVG-relative position (x, y from center), or null if outside ring
+  function getDateAtPosition(svg, clientX, clientY) {
+    if (!selectedDate) return null;
     const rect = svg.getBoundingClientRect();
     const scaleX = size / rect.width;
     const scaleY = size / rect.height;
-    const x = (event.clientX - rect.left) * scaleX - center;
-    const y = (event.clientY - rect.top) * scaleY - center;
-    
-    // Check if click is within the ring area
+    const x = (clientX - rect.left) * scaleX - center;
+    const y = (clientY - rect.top) * scaleY - center;
     const distance = Math.sqrt(x * x + y * y);
-    if (distance < innerRadius - 10 || distance > outerRadius + 30) return;
-    
-    // Convert to angle (0 = top, clockwise)
+    if (distance < innerRadius - 10 || distance > outerRadius + 30) return null;
     let angle = Math.atan2(x, -y) * 180 / Math.PI;
     if (!isClockwise) angle = -angle;
     if (angle < 0) angle += 360;
-    
-    // Convert angle to day of year
     const year = selectedDate.getFullYear();
     const daysInYear = getDaysInYear(year);
     const winterSolsticeDOY = getDayOfYear(getWinterSolstice(year));
-    
-    // Angle 0 = winter solstice, so calculate day from there
     const daysFromWS = Math.round((angle / 360) * daysInYear);
     let targetDOY = winterSolsticeDOY + daysFromWS;
     if (targetDOY > daysInYear) targetDOY -= daysInYear;
     if (targetDOY < 1) targetDOY += daysInYear;
-    
-    // Create the new date
-    const newDate = new Date(year, 0, targetDOY);
-    onDateSelect(newDate);
+    return new Date(year, 0, targetDOY);
+  }
+  
+  function handleRingClick(event) {
+    if (!onDateSelect || !selectedDate) return;
+    const date = getDateAtPosition(event.currentTarget, event.clientX, event.clientY);
+    if (date) onDateSelect(date);
+  }
+  
+  function handleRingMouseMove(event) {
+    const date = getDateAtPosition(event.currentTarget, event.clientX, event.clientY);
+    hoveredDate = date;
+    if (date) {
+      tooltipX = event.clientX;
+      tooltipY = event.clientY;
+    }
+  }
+  
+  function handleRingMouseLeave() {
+    hoveredDate = null;
   }
   
   // Load from localStorage, default to clockwise (true)
@@ -244,11 +254,14 @@
   
   <div class="flex flex-1 min-h-0 justify-center">
     <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
     <svg 
       viewBox="0 0 {size} {size}" 
       class="w-full max-w-xl cursor-pointer outline-none"
       style="max-height: 520px;"
       onclick={handleRingClick}
+      onmousemove={handleRingMouseMove}
+      onmouseleave={handleRingMouseLeave}
       role="img"
       aria-label="Year graph showing daylight throughout the year. Click to select a date."
     >
@@ -302,11 +315,12 @@
         <g
           role="button"
           tabindex="0"
+          aria-label="Select {marker.name} ({marker.dateStr})"
           class="cursor-pointer hover:opacity-80 outline-none focus:outline-none focus:ring-0"
           onclick={(e) => { e.stopPropagation(); onDateSelect?.(marker.date); }}
           onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onDateSelect?.(marker.date); } }}
-          title="Select {marker.name} ({marker.dateStr})"
         >
+          <title>Select {marker.name} ({marker.dateStr})</title>
           <!-- Diamond marker -->
           <g transform="translate({marker.markerPos.x}, {marker.markerPos.y})">
             <rect 
@@ -381,18 +395,41 @@
       {/if}
       
       {#if oppositeDate}
-        <text
-          x={center}
-          y={center + 24}
-          text-anchor="middle"
-          class="fill-orange-500 dark:fill-orange-400"
-          font-size="12"
+        <g
+          role="button"
+          tabindex="0"
+          class="cursor-pointer hover:opacity-80 outline-none focus:outline-none focus:ring-0"
+          onclick={(e) => { e.stopPropagation(); onDateSelect?.(oppositeDate.date); }}
+          onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onDateSelect?.(oppositeDate.date); } }}
+          style="cursor: pointer;"
         >
-          Mirror: {formatDateShort(oppositeDate.date)}
-        </text>
+          <text
+            x={center}
+            y={center + 24}
+            text-anchor="middle"
+            class="fill-orange-500 dark:fill-orange-400"
+            font-size="12"
+          >
+            Mirror: {formatDateShort(oppositeDate.date)}
+          </text>
+        </g>
       {/if}
     </svg>
   </div>
+  
+  <!-- Hover tooltip: day stats -->
+  {#if hoveredDate}
+    {@const stats = getDayStatsForTooltip(hoveredDate, latitude, longitude, timezone)}
+    <div
+      class="fixed z-50 px-2 py-1.5 text-xs rounded shadow-lg bg-gray-800 text-gray-100 dark:bg-gray-700 dark:text-gray-200 pointer-events-none"
+      style="left: {tooltipX + 12}px; top: {tooltipY + 8}px;"
+    >
+      <div class="font-medium">{stats.dateLabel}</div>
+      <div>Sunrise: {stats.sunrise}</div>
+      <div>Sunset: {stats.sunset}</div>
+      <div>Daylight: {stats.daylight}</div>
+    </div>
+  {/if}
   
   <!-- Legend -->
   <div class="mt-4 flex flex-wrap justify-center gap-4 text-xs">

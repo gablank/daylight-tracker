@@ -127,7 +127,7 @@
           <div class="border-t border-gray-200 dark:border-gray-700 p-4 space-y-4">
             <LatitudeSelector bind:latitude bind:longitude bind:timezone />
             <hr class="border-gray-200 dark:border-gray-700" />
-            <DatePicker bind:selectedDate />
+            <DatePicker bind:selectedDate {latitude} {longitude} {timezone} />
           </div>
         {/if}
       </div>
@@ -140,6 +140,8 @@
         {yearData} 
         {oppositeDate} 
         {latitude} 
+        {longitude} 
+        {timezone} 
         onDateSelect={(date) => selectedDate = date}
       />
       <div class="flex flex-col gap-6 min-h-0">
@@ -148,6 +150,9 @@
             bind:derivativeCount
             {yearData} 
             {selectedDate} 
+            {latitude}
+            {longitude}
+            {timezone}
             onDateSelect={(date) => selectedDate = date}
           />
         </div>
@@ -159,8 +164,8 @@
     
     <!-- Bottom section: Stats and Upcoming Dates side by side -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <StatsTable {selectedDate} {yearData} {latitude} {longitude} {oppositeDate} />
-      <UpcomingDates {selectedDate} {yearData} {latitude} {longitude} {timezone} />
+      <StatsTable {selectedDate} {yearData} {latitude} {longitude} {oppositeDate} {timezone} onDateSelect={(date) => selectedDate = date} />
+      <UpcomingDates {selectedDate} {yearData} {latitude} {longitude} {timezone} onDateSelect={(date) => selectedDate = date} />
     </div>
     
     <!-- Footer -->

@@ -1,6 +1,7 @@
 <script>
   import { 
     formatDateShort, 
+    getDayStatsForTooltip,
     getUpcomingAstronomicalEvents, 
     findUpcomingDaylightMilestones,
     findUpcomingSunriseMilestones,
@@ -8,7 +9,11 @@
     findUpcomingDSTChanges
   } from '../lib/solar.js';
   
-  let { selectedDate, yearData, latitude, longitude, timezone } = $props();
+  let { selectedDate, yearData, latitude, longitude, timezone, onDateSelect = null } = $props();
+
+  let hoveredGroup = $state(null);
+  let tooltipX = $state(0);
+  let tooltipY = $state(0);
   
   // Priority values for sub-sorting within same date (lower = appears first)
   const PRIORITY = {
@@ -211,10 +216,21 @@
         <tbody>
           {#each groupedEvents as group, groupIdx}
             {#each group.events as event, eventIdx}
-              <tr class="{groupIdx > 0 && eventIdx === 0 ? 'border-t border-gray-300 dark:border-gray-600' : ''}">
+              <tr
+                class="{groupIdx > 0 && eventIdx === 0 ? 'border-t border-gray-300 dark:border-gray-600' : ''}"
+                onmouseenter={() => hoveredGroup = group}
+                onmousemove={(e) => { tooltipX = e.clientX; tooltipY = e.clientY; }}
+                onmouseleave={() => hoveredGroup = null}
+              >
                 <td class="py-1.5 pr-4 text-gray-900 dark:text-gray-100 whitespace-nowrap align-top">
                   {#if eventIdx === 0}
-                    <span class="font-medium">{formatDateShort(group.date)}</span>
+                    <button
+                      type="button"
+                      class="font-medium text-left cursor-pointer hover:underline focus:outline-none focus:ring-2 focus:ring-orange-400 rounded px-0.5 -mx-0.5"
+                      onclick={() => onDateSelect?.(group.date)}
+                    >
+                      {formatDateShort(group.date)}
+                    </button>
                   {/if}
                 </td>
                 <td class="py-1.5 text-gray-600 dark:text-gray-400">
@@ -238,5 +254,17 @@
     </div>
   {:else}
     <p class="text-gray-500 dark:text-gray-400 text-sm">Loading upcoming dates...</p>
+  {/if}
+  {#if hoveredGroup}
+    {@const stats = getDayStatsForTooltip(hoveredGroup.date, latitude, longitude, timezone)}
+    <div
+      class="fixed z-50 px-2 py-1.5 text-xs rounded shadow-lg bg-gray-800 text-gray-100 dark:bg-gray-700 dark:text-gray-200 pointer-events-none"
+      style="left: {tooltipX + 12}px; top: {tooltipY + 8}px;"
+    >
+      <div class="font-medium">{stats.dateLabel}</div>
+      <div>Sunrise: {stats.sunrise}</div>
+      <div>Sunset: {stats.sunset}</div>
+      <div>Daylight: {stats.daylight}</div>
+    </div>
   {/if}
 </div>

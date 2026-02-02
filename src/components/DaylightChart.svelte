@@ -1,8 +1,12 @@
 <script>
-  import { getDayOfYear, getDaysInYear } from '../lib/solar.js';
+  import { getDayOfYear, getDaysInYear, getDayStatsForTooltip } from '../lib/solar.js';
   import { formatDurationChangeMinutesSeconds } from '../lib/utils.js';
 
-  let { yearData, selectedDate, onDateSelect = null, derivativeCount = $bindable(1) } = $props();
+  let { yearData, selectedDate, latitude = 0, longitude = 0, timezone = null, onDateSelect = null, derivativeCount = $bindable(1) } = $props();
+
+  let hoveredDate = $state(null);
+  let tooltipX = $state(0);
+  let tooltipY = $state(0);
 
   const width = 600;
   const height = 300;
@@ -127,21 +131,37 @@
     return formatDurationChangeMinutesSeconds(changeMs);
   });
 
-  function handleChartClick(event) {
-    if (!onDateSelect || !selectedDate || !yearData?.length) return;
-    const svg = event.currentTarget;
+  function getDateAtX(svg, clientX) {
+    if (!selectedDate || !yearData?.length) return null;
     const rect = svg.getBoundingClientRect();
-    // SVG viewBox scales uniformly (preserveAspectRatio default: xMidYMid meet)
     const scale = Math.min(rect.width / width, rect.height / height);
     const offsetX = (rect.width - width * scale) / 2;
-    const svgX = (event.clientX - rect.left - offsetX) / scale;
+    const svgX = (clientX - rect.left - offsetX) / scale;
     const clickX = svgX - padding.left;
-    if (clickX < 0 || clickX > chartWidth) return;
+    if (clickX < 0 || clickX > chartWidth) return null;
     const year = selectedDate.getFullYear();
     const daysInYear = getDaysInYear(year);
     const dayOfYear = Math.round((clickX / chartWidth) * (daysInYear - 1)) + 1;
-    const newDate = new Date(year, 0, dayOfYear);
-    onDateSelect(newDate);
+    return new Date(year, 0, dayOfYear);
+  }
+
+  function handleChartClick(event) {
+    if (!onDateSelect || !selectedDate || !yearData?.length) return;
+    const newDate = getDateAtX(event.currentTarget, event.clientX);
+    if (newDate) onDateSelect(newDate);
+  }
+
+  function handleChartMouseMove(event) {
+    const date = getDateAtX(event.currentTarget, event.clientX);
+    hoveredDate = date;
+    if (date) {
+      tooltipX = event.clientX;
+      tooltipY = event.clientY;
+    }
+  }
+
+  function handleChartMouseLeave() {
+    hoveredDate = null;
   }
 </script>
 
@@ -164,12 +184,14 @@
     </label>
   </div>
   <div class="flex-1 min-h-0">
-  <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_noninteractive_element_interactions -->
+  <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions a11y_no_noninteractive_element_interactions -->
   <svg
     viewBox="0 0 {width} {height}"
     class="w-full max-w-3xl cursor-pointer outline-none"
     style="max-height: 320px;"
     onclick={handleChartClick}
+    onmousemove={handleChartMouseMove}
+    onmouseleave={handleChartMouseLeave}
     role="img"
     aria-label="Daylight hours through the year. Click to select a date."
   >
@@ -317,4 +339,16 @@
     {/if}
   </svg>
   </div>
+  {#if hoveredDate}
+    {@const stats = getDayStatsForTooltip(hoveredDate, latitude, longitude, timezone)}
+    <div
+      class="fixed z-50 px-2 py-1.5 text-xs rounded shadow-lg bg-gray-800 text-gray-100 dark:bg-gray-700 dark:text-gray-200 pointer-events-none"
+      style="left: {tooltipX + 12}px; top: {tooltipY + 8}px;"
+    >
+      <div class="font-medium">{stats.dateLabel}</div>
+      <div>Sunrise: {stats.sunrise}</div>
+      <div>Sunset: {stats.sunset}</div>
+      <div>Daylight: {stats.daylight}</div>
+    </div>
+  {/if}
 </div>

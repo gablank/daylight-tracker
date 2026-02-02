@@ -11,3 +11,9 @@ body {
   margin: 0;
   min-height: 100vh;
 }
+
+/* Hide focus ring on click; show only for keyboard focus (accessibility) */
+*:focus:not(:focus-visible) {
+  outline: none;
+  box-shadow: none;
+}

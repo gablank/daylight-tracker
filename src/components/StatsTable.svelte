@@ -1,8 +1,12 @@
 <script>
-  import { formatDuration, formatDateShort, getSunData, findDateWithGain, getDayOfYear } from '../lib/solar.js';
+  import { formatDuration, formatDateShort, getSunData, findDateWithGain, getDayOfYear, getDayStatsForTooltip } from '../lib/solar.js';
   import { addDays, formatDurationChange } from '../lib/utils.js';
   
-  let { selectedDate, yearData, latitude, oppositeDate, longitude = 0 } = $props();
+  let { selectedDate, yearData, latitude, oppositeDate, longitude = 0, timezone = null, onDateSelect = null } = $props();
+
+  let hoveredDate = $state(null);
+  let tooltipX = $state(0);
+  let tooltipY = $state(0);
   
   // Section 0: Mirror/Opposite date info
   let mirrorDateInfo = $derived.by(() => {
@@ -18,6 +22,7 @@
     
     return {
       date: formatDateShort(oppositeDate.date),
+      dateObj: oppositeDate.date,
       daylight: formatDuration(oppositeData.daylight),
       currentDaylight: formatDuration(currentData.daylight),
       diff: Math.abs(oppositeData.daylight - currentData.daylight)
@@ -39,6 +44,7 @@
       return {
         label: `+${w}w`,
         date: formatDateShort(date),
+        dateObj: date,
         daylight: formatDuration(futureData.daylight),
         change: formatDurationChange(change),
         isGain: change >= 0
@@ -70,6 +76,7 @@
       return {
         label,
         date: result ? formatDateShort(result.date) : 'N/A',
+        dateObj: result ? result.date : null,
         daylight: result ? formatDuration(result.daylight) : '--',
         isGain: value > 0
       };
@@ -88,7 +95,16 @@
       </h4>
       <div class="bg-orange-50 dark:bg-orange-900/20 rounded-md p-3">
         <p class="text-sm text-gray-700 dark:text-gray-300">
-          <span class="font-semibold text-orange-600 dark:text-orange-400">{mirrorDateInfo.date}</span>
+          <button
+            type="button"
+            class="font-semibold text-orange-600 dark:text-orange-400 cursor-pointer hover:underline focus:outline-none focus:ring-2 focus:ring-orange-400 rounded px-0.5 -mx-0.5"
+            onclick={() => onDateSelect?.(mirrorDateInfo.dateObj)}
+            onmouseenter={(e) => { hoveredDate = mirrorDateInfo.dateObj; tooltipX = e.clientX; tooltipY = e.clientY; }}
+            onmousemove={(e) => { tooltipX = e.clientX; tooltipY = e.clientY; }}
+            onmouseleave={() => hoveredDate = null}
+          >
+            {mirrorDateInfo.date}
+          </button>
           has the same amount of daylight ({mirrorDateInfo.daylight}) as the selected date, 
           but on the opposite side of the winter solstice.
         </p>
@@ -115,9 +131,22 @@
           </thead>
           <tbody>
             {#each futureDaylight as row}
-              <tr class="border-b border-gray-100 dark:border-gray-700/50">
+              <tr
+                class="border-b border-gray-100 dark:border-gray-700/50"
+                onmouseenter={(e) => { hoveredDate = row.dateObj; tooltipX = e.clientX; tooltipY = e.clientY; }}
+                onmousemove={(e) => { tooltipX = e.clientX; tooltipY = e.clientY; }}
+                onmouseleave={() => hoveredDate = null}
+              >
                 <td class="py-1.5 pr-3 text-gray-900 dark:text-gray-100">{row.label}</td>
-                <td class="py-1.5 pr-3 text-gray-600 dark:text-gray-400 text-xs">{row.date}</td>
+                <td class="py-1.5 pr-3 text-gray-600 dark:text-gray-400 text-xs">
+                  <button
+                    type="button"
+                    class="cursor-pointer hover:underline focus:outline-none focus:ring-2 focus:ring-orange-400 rounded px-0.5 -mx-0.5 text-left"
+                    onclick={() => onDateSelect?.(row.dateObj)}
+                  >
+                    {row.date}
+                  </button>
+                </td>
                 <td class="py-1.5 pr-3 text-gray-900 dark:text-gray-100 font-medium">{row.daylight}</td>
                 <td class="py-1.5 font-medium {row.isGain ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}">
                   {row.change}
@@ -145,9 +174,26 @@
           </thead>
           <tbody>
             {#each daylightChanges as row}
-              <tr class="border-b border-gray-100 dark:border-gray-700/50">
+              <tr
+                class="border-b border-gray-100 dark:border-gray-700/50"
+                onmouseenter={(e) => { if (row.dateObj) { hoveredDate = row.dateObj; tooltipX = e.clientX; tooltipY = e.clientY; } }}
+                onmousemove={(e) => { if (row.dateObj) { tooltipX = e.clientX; tooltipY = e.clientY; } }}
+                onmouseleave={() => hoveredDate = null}
+              >
                 <td class="py-1.5 pr-3 font-medium {row.isGain ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}">{row.label}</td>
-                <td class="py-1.5 pr-3 text-gray-600 dark:text-gray-400">{row.date}</td>
+                <td class="py-1.5 pr-3 text-gray-600 dark:text-gray-400">
+                  {#if row.dateObj}
+                    <button
+                      type="button"
+                      class="cursor-pointer hover:underline focus:outline-none focus:ring-2 focus:ring-orange-400 rounded px-0.5 -mx-0.5 text-left"
+                      onclick={() => onDateSelect?.(row.dateObj)}
+                    >
+                      {row.date}
+                    </button>
+                  {:else}
+                    {row.date}
+                  {/if}
+                </td>
                 <td class="py-1.5 text-gray-900 dark:text-gray-100 font-medium">{row.daylight}</td>
               </tr>
             {/each}
@@ -156,4 +202,16 @@
       </div>
     </div>
   </div>
+  {#if hoveredDate}
+    {@const stats = getDayStatsForTooltip(hoveredDate, latitude, longitude, timezone)}
+    <div
+      class="fixed z-50 px-2 py-1.5 text-xs rounded shadow-lg bg-gray-800 text-gray-100 dark:bg-gray-700 dark:text-gray-200 pointer-events-none"
+      style="left: {tooltipX + 12}px; top: {tooltipY + 8}px;"
+    >
+      <div class="font-medium">{stats.dateLabel}</div>
+      <div>Sunrise: {stats.sunrise}</div>
+      <div>Sunset: {stats.sunset}</div>
+      <div>Daylight: {stats.daylight}</div>
+    </div>
+  {/if}
 </div>
