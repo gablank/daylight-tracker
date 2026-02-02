@@ -82,6 +82,17 @@
       };
     });
   });
+
+  // Clear hover/tooltip on scroll or touchmove so it doesn't stick on mobile
+  $effect(() => {
+    const clear = () => { hoveredDate = null; };
+    window.addEventListener('scroll', clear, true);
+    window.addEventListener('touchmove', clear, true);
+    return () => {
+      window.removeEventListener('scroll', clear, true);
+      window.removeEventListener('touchmove', clear, true);
+    };
+  });
 </script>
 
 <div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
@@ -98,7 +109,7 @@
           <button
             type="button"
             class="font-semibold text-orange-600 dark:text-orange-400 cursor-pointer hover:underline focus:outline-none focus:ring-2 focus:ring-orange-400 rounded px-0.5 -mx-0.5"
-            onclick={() => onDateSelect?.(mirrorDateInfo.dateObj)}
+            onclick={() => { hoveredDate = null; onDateSelect?.(mirrorDateInfo.dateObj); }}
             onmouseenter={(e) => { hoveredDate = mirrorDateInfo.dateObj; tooltipX = e.clientX; tooltipY = e.clientY; }}
             onmousemove={(e) => { tooltipX = e.clientX; tooltipY = e.clientY; }}
             onmouseleave={() => hoveredDate = null}
@@ -142,7 +153,7 @@
                   <button
                     type="button"
                     class="cursor-pointer hover:underline focus:outline-none focus:ring-2 focus:ring-orange-400 rounded px-0.5 -mx-0.5 text-left"
-                    onclick={() => onDateSelect?.(row.dateObj)}
+                    onclick={() => { hoveredDate = null; onDateSelect?.(row.dateObj); }}
                   >
                     {row.date}
                   </button>
@@ -186,7 +197,7 @@
                     <button
                       type="button"
                       class="cursor-pointer hover:underline focus:outline-none focus:ring-2 focus:ring-orange-400 rounded px-0.5 -mx-0.5 text-left"
-                      onclick={() => onDateSelect?.(row.dateObj)}
+                      onclick={() => { hoveredDate = null; onDateSelect?.(row.dateObj); }}
                     >
                       {row.date}
                     </button>

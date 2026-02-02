@@ -174,6 +174,17 @@
   function handleAltChartMouseLeave() {
     tooltip = null;
   }
+
+  // Clear tooltip on scroll or touchmove so it doesn't stick on mobile
+  $effect(() => {
+    const clear = () => { tooltip = null; };
+    window.addEventListener('scroll', clear, true);
+    window.addEventListener('touchmove', clear, true);
+    return () => {
+      window.removeEventListener('scroll', clear, true);
+      window.removeEventListener('touchmove', clear, true);
+    };
+  });
 </script>
 
 <div class="min-h-0 bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm flex flex-col">

@@ -199,6 +199,17 @@
     
     return groups;
   });
+
+  // Clear hover/tooltip on scroll or touchmove so it doesn't stick on mobile
+  $effect(() => {
+    const clear = () => { hoveredGroup = null; };
+    window.addEventListener('scroll', clear, true);
+    window.addEventListener('touchmove', clear, true);
+    return () => {
+      window.removeEventListener('scroll', clear, true);
+      window.removeEventListener('touchmove', clear, true);
+    };
+  });
 </script>
 
 <div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
@@ -227,7 +238,7 @@
                     <button
                       type="button"
                       class="font-medium text-left cursor-pointer hover:underline focus:outline-none focus:ring-2 focus:ring-orange-400 rounded px-0.5 -mx-0.5"
-                      onclick={() => onDateSelect?.(group.date)}
+                      onclick={() => { hoveredGroup = null; onDateSelect?.(group.date); }}
                     >
                       {formatDateShort(group.date)}
                     </button>

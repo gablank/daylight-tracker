@@ -43,6 +43,7 @@
     if (!onDateSelect || !selectedDate) return;
     const date = getDateAtPosition(event.currentTarget, event.clientX, event.clientY);
     if (date) onDateSelect(date);
+    hoveredDate = null;
   }
   
   function handleRingMouseMove(event) {
@@ -74,7 +75,18 @@
     isClockwise = e.target.checked;
     localStorage.setItem('daylight-tracker-clockwise', String(isClockwise));
   }
-  
+
+  // Clear hover/tooltip on scroll or touchmove so it doesn't stick on mobile
+  $effect(() => {
+    const clear = () => { hoveredDate = null; };
+    window.addEventListener('scroll', clear, true);
+    window.addEventListener('touchmove', clear, true);
+    return () => {
+      window.removeEventListener('scroll', clear, true);
+      window.removeEventListener('touchmove', clear, true);
+    };
+  });
+
   // Convert angle to SVG coordinates
   function polarToCartesian(angle, radius) {
     const directedAngle = isClockwise ? angle : -angle;
@@ -327,7 +339,7 @@
           tabindex="0"
           aria-label="Select {marker.name} ({marker.dateStr})"
           class="cursor-pointer hover:opacity-80 outline-none focus:outline-none focus:ring-0"
-          onclick={(e) => { e.stopPropagation(); onDateSelect?.(marker.date); }}
+          onclick={(e) => { e.stopPropagation(); hoveredDate = null; onDateSelect?.(marker.date); }}
           onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onDateSelect?.(marker.date); } }}
         >
           <title>Select {marker.name} ({marker.dateStr})</title>
@@ -441,7 +453,7 @@
           role="button"
           tabindex="0"
           class="cursor-pointer hover:opacity-80 outline-none focus:outline-none focus:ring-0"
-          onclick={(e) => { e.stopPropagation(); onDateSelect?.(oppositeDate.date); }}
+          onclick={(e) => { e.stopPropagation(); hoveredDate = null; onDateSelect?.(oppositeDate.date); }}
           onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onDateSelect?.(oppositeDate.date); } }}
           style="cursor: pointer;"
         >

@@ -149,6 +149,7 @@
     if (!onDateSelect || !selectedDate || !yearData?.length) return;
     const newDate = getDateAtX(event.currentTarget, event.clientX);
     if (newDate) onDateSelect(newDate);
+    hoveredDate = null;
   }
 
   function handleChartMouseMove(event) {
@@ -163,6 +164,17 @@
   function handleChartMouseLeave() {
     hoveredDate = null;
   }
+
+  // Clear hover/tooltip on scroll or touchmove so it doesn't stick on mobile
+  $effect(() => {
+    const clear = () => { hoveredDate = null; };
+    window.addEventListener('scroll', clear, true);
+    window.addEventListener('touchmove', clear, true);
+    return () => {
+      window.removeEventListener('scroll', clear, true);
+      window.removeEventListener('touchmove', clear, true);
+    };
+  });
 </script>
 
 <div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm flex flex-col">
