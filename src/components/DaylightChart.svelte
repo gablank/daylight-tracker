@@ -2,13 +2,19 @@
   import { getDayOfYear, getDaysInYear } from '../lib/solar.js';
   import { formatDurationChangeMinutesSeconds } from '../lib/utils.js';
 
-  let { yearData, selectedDate, onDateSelect = null } = $props();
+  let { yearData, selectedDate, onDateSelect = null, derivativeCount = $bindable(1) } = $props();
 
   const width = 600;
   const height = 300;
-  const padding = { top: 20, right: 52, bottom: 40, left: 45 };
-  const chartWidth = width - padding.left - padding.right;
-  const chartHeight = height - padding.top - padding.bottom;
+  const axisWidth = 40;
+  const padding = $derived({
+    top: 20,
+    right: 12 + axisWidth * Math.max(1, Math.min(5, derivativeCount)),
+    bottom: 40,
+    left: 45
+  });
+  const chartWidth = $derived(width - padding.left - padding.right);
+  const chartHeight = $derived(height - padding.top - padding.bottom);
 
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -26,30 +32,47 @@
       .join(' ');
   });
 
-  // Derivative: change in daylight per day (minutes per day)
-  let derivativeData = $derived.by(() => {
-    if (!yearData || yearData.length < 2) return { path: '', maxAbs: 1, ticks: [] };
-    const minutesPerDay = [];
-    for (let i = 1; i < yearData.length; i++) {
-      const changeMs = yearData[i].daylight - yearData[i - 1].daylight;
-      minutesPerDay.push(changeMs / (1000 * 60));
+  // Derivatives: array of { path, maxAbs, ticks } for orders 1..derivativeCount
+  const derivativeColors = [
+    'rgb(16, 185, 129)',   // 1st: emerald
+    'rgb(139, 92, 246)',   // 2nd: violet
+    'rgb(245, 158, 11)',   // 3rd: amber
+    'rgb(244, 63, 94)',    // 4th: rose
+    'rgb(14, 165, 233)'    // 5th: sky
+  ];
+
+  let derivativesArray = $derived.by(() => {
+    if (!yearData || yearData.length < 2) return [];
+    const count = Math.max(1, Math.min(5, derivativeCount));
+    const result = [];
+    let values = yearData.map((d) => d.daylight / (1000 * 60));
+    const n = yearData.length;
+
+    for (let order = 1; order <= count; order++) {
+      if (values.length < 2) break;
+      const nextValues = [];
+      for (let i = 1; i < values.length; i++) {
+        nextValues.push(values[i] - values[i - 1]);
+      }
+      values = nextValues;
+      const maxAbs = Math.max(0.01, ...values.map((d) => Math.abs(d)));
+      const path = values
+        .map((deriv, i) => {
+          const dayIndex = i + order * 0.5;
+          const x = padding.left + (dayIndex / Math.max(n - 1, 1)) * chartWidth;
+          const y = padding.top + chartHeight / 2 - (deriv / maxAbs) * (chartHeight / 2);
+          return `${i === 0 ? 'M' : 'L'} ${x} ${y}`;
+        })
+        .join(' ');
+      const tickStep = maxAbs <= 0.5 ? 0.1 : maxAbs <= 2 ? 0.5 : maxAbs <= 5 ? 1 : Math.ceil(maxAbs / 5);
+      const ticks = [];
+      for (let t = -maxAbs; t <= maxAbs + 0.01; t += tickStep) {
+        ticks.push(Math.round(t * 100) / 100);
+      }
+      if (ticks.length === 0) ticks.push(0);
+      result.push({ path, maxAbs, ticks, order });
     }
-    const maxAbs = Math.max(1, ...minutesPerDay.map((d) => Math.abs(d)));
-    const n = minutesPerDay.length;
-    const path = minutesPerDay
-      .map((deriv, i) => {
-        const x = padding.left + ((i + 0.5) / Math.max(n, 1)) * chartWidth;
-        const y = padding.top + chartHeight / 2 - (deriv / maxAbs) * (chartHeight / 2);
-        return `${i === 0 ? 'M' : 'L'} ${x} ${y}`;
-      })
-      .join(' ');
-    const tickStep = maxAbs <= 2 ? 0.5 : maxAbs <= 5 ? 1 : maxAbs <= 10 ? 2 : Math.ceil(maxAbs / 5);
-    const ticks = [];
-    for (let t = -maxAbs; t <= maxAbs + 0.01; t += tickStep) {
-      ticks.push(Math.round(t * 10) / 10);
-    }
-    if (ticks.length === 0) ticks.push(0);
-    return { path, maxAbs, ticks };
+    return result;
   });
 
   // Area fill (line + bottom edge)
@@ -114,7 +137,23 @@
 </script>
 
 <div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm mt-4">
-  <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Daylight Through the Year</h3>
+  <div class="flex items-center justify-between mb-3">
+    <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">Daylight Through the Year</h3>
+    <label class="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+      <span>Derivatives:</span>
+      <input
+        type="number"
+        min="1"
+        max="5"
+        value={derivativeCount}
+        oninput={(e) => {
+          const v = parseInt(e.currentTarget.value, 10);
+          if (!isNaN(v)) derivativeCount = Math.max(1, Math.min(5, v));
+        }}
+        class="w-14 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 py-1 text-gray-900 dark:text-gray-100 text-center"
+      />
+    </label>
+  </div>
   <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_noninteractive_element_interactions -->
   <svg
     viewBox="0 0 {width} {height}"
@@ -153,37 +192,44 @@
       </text>
     {/each}
 
-    <!-- Zero line for derivative (horizontal at middle) -->
-    <line
-      x1={padding.left}
-      y1={padding.top + chartHeight / 2}
-      x2={width - padding.right}
-      y2={padding.top + chartHeight / 2}
-      stroke="rgb(16, 185, 129)"
-      stroke-opacity="0.3"
-      stroke-dasharray="4,4"
-    />
+    <!-- Zero line for derivatives (horizontal at middle) -->
+    {#if derivativesArray.length > 0}
+      <line
+        x1={padding.left}
+        y1={padding.top + chartHeight / 2}
+        x2={width - padding.right}
+        y2={padding.top + chartHeight / 2}
+        stroke="currentColor"
+        stroke-opacity="0.2"
+        stroke-dasharray="4,4"
+      />
+    {/if}
 
-    <!-- Right Y-axis: derivative (min/day) ticks and labels -->
-    {#each derivativeData.ticks as tick}
-      {@const y = padding.top + chartHeight / 2 - (tick / derivativeData.maxAbs) * (chartHeight / 2)}
+    <!-- Right Y-axes: one per derivative -->
+    {#each derivativesArray as deriv, idx}
+      {@const axisX = width - padding.right - (derivativesArray.length - 1 - idx) * axisWidth}
+      {#each deriv.ticks as tick}
+        {@const y = padding.top + chartHeight / 2 - (tick / deriv.maxAbs) * (chartHeight / 2)}
+        <text
+          x={axisX + 8}
+          y={y + 4}
+          text-anchor="start"
+          class="text-xs"
+          style="fill: {derivativeColors[idx]}"
+        >
+          {tick >= 0 ? '+' : ''}{tick}
+        </text>
+      {/each}
       <text
-        x={width - padding.right + 8}
-        y={y + 4}
-        text-anchor="start"
-        class="fill-emerald-600 dark:fill-emerald-400 text-xs"
+        x={axisX - 4}
+        y={padding.top - 4}
+        text-anchor="end"
+        class="text-[10px]"
+        style="fill: {derivativeColors[idx]}"
       >
-        {tick >= 0 ? '+' : ''}{tick}
+        {deriv.order === 1 ? 'Δ min/day' : `Δ${deriv.order}`}
       </text>
     {/each}
-    <text
-      x={width - padding.right - 4}
-      y={padding.top - 4}
-      text-anchor="end"
-      class="fill-emerald-600 dark:fill-emerald-400 text-[10px]"
-    >
-      Δ min/day
-    </text>
 
     <!-- X-axis: month ticks and labels -->
     {#each monthTicks as { x, label }}
@@ -221,18 +267,20 @@
       stroke-linejoin="round"
     />
 
-    <!-- Derivative line (change per day, right y-axis) -->
-    {#if derivativeData.path}
-      <path
-        d={derivativeData.path}
-        fill="none"
-        stroke="rgb(16, 185, 129)"
-        stroke-width="1.5"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        stroke-opacity="0.9"
-      />
-    {/if}
+    <!-- Derivative lines (each with own y-axis) -->
+    {#each derivativesArray as deriv, idx}
+      {#if deriv.path}
+        <path
+          d={deriv.path}
+          fill="none"
+          stroke={derivativeColors[idx]}
+          stroke-width="1.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-opacity="0.9"
+        />
+      {/if}
+    {/each}
 
     <!-- Selected date vertical line -->
     {#if selectedDateX !== null}

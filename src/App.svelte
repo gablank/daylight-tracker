@@ -17,6 +17,7 @@
   let longitude = $state(10.7);
   let timezone = $state('Europe/Oslo');
   let selectedDate = $state(getToday());
+  let derivativeCount = $state(1);
   let settingsLoaded = $state(false);
   
   // Load settings from localStorage on mount (selectedDate always defaults to today)
@@ -30,6 +31,7 @@
         if (settings.latitude !== undefined) latitude = settings.latitude;
         if (settings.longitude !== undefined) longitude = settings.longitude;
         if (settings.timezone) timezone = settings.timezone;
+        if (settings.derivativeCount !== undefined) derivativeCount = Math.max(1, Math.min(5, settings.derivativeCount));
         // Note: selectedDate is NOT restored - always use current date on page load
         settingsLoaded = true;
       } catch {
@@ -62,7 +64,8 @@
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
       latitude,
       longitude,
-      timezone
+      timezone,
+      derivativeCount
     }));
   });
   
@@ -117,6 +120,7 @@
           onDateSelect={(date) => selectedDate = date}
         />
         <DaylightChart 
+          bind:derivativeCount
           {yearData} 
           {selectedDate} 
           onDateSelect={(date) => selectedDate = date}
