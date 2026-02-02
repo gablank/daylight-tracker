@@ -82,8 +82,8 @@
   // Current day's sun data (uses actual longitude for accurate times)
   let sunData = $derived(getSunData(selectedDate, latitude, longitude));
   
-  // Opposite date (geometric calculation, latitude-independent)
-  let oppositeDate = $derived(findOppositeDate(selectedDate));
+  // Mirror date: the date with the same amount of daylight on the other half of the year
+  let oppositeDate = $derived(findOppositeDate(selectedDate, yearData));
 </script>
 
 <div class="min-h-screen bg-gray-100 dark:bg-gray-900 py-8 px-4">

@@ -159,50 +159,47 @@ export function computeYearData(latitude, year) {
 }
 
 /**
- * Find the opposite date - a date with the same daylight duration on the other half of the year
+ * Find the opposite date (mirror date) - the date with the same amount of daylight
+ * as the selected date, on the other half of the year.
  * @param {Date} currentDate - The current date
- * @param {Array} yearData - The precomputed year data
- * @param {number} latitude - The latitude (to determine hemisphere)
- * @returns {Object|null} The opposite date data or null if not found
+ * @param {Array} yearData - The precomputed year data (from computeYearData)
+ * @returns {Object|null} Object with date property for the mirror date, or null if not found
  */
-/**
- * Find the opposite date (mirror date) - purely geometric calculation.
- * The mirror date is the same number of days from winter solstice on the opposite side.
- * This is latitude-independent.
- * @param {Date} currentDate - The current date
- * @returns {Object} Object with date property for the opposite date
- */
-export function findOppositeDate(currentDate) {
-  const currentDayOfYear = getDayOfYear(currentDate);
+export function findOppositeDate(currentDate, yearData) {
+  if (!yearData || yearData.length === 0) return null;
+
+  const daysInYear = yearData.length;
+  const currentDOY = getDayOfYear(currentDate);
+  const currentData = yearData[currentDOY - 1];
+  if (!currentData) return null;
+
+  const targetDaylight = currentData.daylight;
   const year = currentDate.getFullYear();
-  const winterSolstice = getWinterSolstice(year);
-  const winterSolsticeDOY = getDayOfYear(winterSolstice);
-  const daysInYear = getDaysInYear(year);
-  
-  // Calculate distance from winter solstice
-  let daysFromWinterSolstice = currentDayOfYear - winterSolsticeDOY;
-  
-  // Handle year wrap (winter solstice is near end of year)
-  if (daysFromWinterSolstice < -daysInYear / 2) {
-    daysFromWinterSolstice += daysInYear;
-  } else if (daysFromWinterSolstice > daysInYear / 2) {
-    daysFromWinterSolstice -= daysInYear;
+  const summerSolsticeDOY = getDayOfYear(getSummerSolstice(year));
+
+  // Other half = opposite side of summer solstice (same-daylight pairs are symmetric around it).
+  // Before solstice (Jan–June 20): search after solstice (June 22–Dec 31).
+  // After solstice (June 22–Dec 31): search before solstice (Jan 1–June 21).
+  const isBeforeOrOnSolstice = currentDOY <= summerSolsticeDOY;
+  const otherHalfStart = isBeforeOrOnSolstice ? summerSolsticeDOY + 1 : 1;
+  const otherHalfEnd = isBeforeOrOnSolstice ? daysInYear : summerSolsticeDOY - 1;
+
+  let bestDOY = null;
+  let bestDiff = Infinity;
+
+  for (let doy = otherHalfStart; doy <= otherHalfEnd; doy++) {
+    if (doy === currentDOY) continue; // never pick the same day as its own mirror
+    const data = yearData[doy - 1];
+    if (!data) continue;
+    const diff = Math.abs(data.daylight - targetDaylight);
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      bestDOY = doy;
+    }
   }
-  
-  // The mirror date is at the same distance but on the other side of winter solstice
-  let oppositeDOY = winterSolsticeDOY - daysFromWinterSolstice;
-  
-  // Wrap around year
-  if (oppositeDOY <= 0) {
-    oppositeDOY += daysInYear;
-  } else if (oppositeDOY > daysInYear) {
-    oppositeDOY -= daysInYear;
-  }
-  
-  // Create the date object from day of year
-  const oppositeDate = new Date(year, 0, oppositeDOY);
-  
-  return { date: oppositeDate };
+
+  if (bestDOY == null) return null;
+  return { date: new Date(year, 0, bestDOY) };
 }
 
 /**
