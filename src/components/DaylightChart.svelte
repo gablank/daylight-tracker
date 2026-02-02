@@ -10,13 +10,19 @@
 
   const width = 600;
   const height = 300;
-  const axisWidth = 40;
-  const padding = $derived({
-    top: 20,
-    right: 12 + axisWidth * Math.max(1, Math.min(5, derivativeCount)),
-    bottom: 40,
-    left: 45
-  });
+  // Right edge: space for rightmost axis labels (e.g. "Δ min/day") so they don't get cropped
+  const rightEdgePadding = 54;
+  // Per-axis step between derivative axes (enough to avoid overlap)
+  const axisWidth = 28;
+  const padding = $derived((() => {
+    const count = Math.max(1, Math.min(5, derivativeCount));
+    return {
+      top: 20,
+      right: rightEdgePadding + (count - 1) * axisWidth,
+      bottom: 40,
+      left: 45
+    };
+  })());
   const chartWidth = $derived(width - padding.left - padding.right);
   const chartHeight = $derived(height - padding.top - padding.bottom);
 
@@ -191,7 +197,7 @@
           const v = parseInt(e.currentTarget.value, 10);
           if (!isNaN(v)) derivativeCount = Math.max(1, Math.min(5, v));
         }}
-        class="w-14 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 py-1 text-gray-900 dark:text-gray-100 text-center"
+        class="w-14 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 py-1 text-gray-900 dark:text-gray-100 text-center focus:outline-none focus:ring-0"
       />
     </label>
   </div>
@@ -249,9 +255,9 @@
       />
     {/if}
 
-    <!-- Right Y-axes: one per derivative -->
+    <!-- Right Y-axes: one per derivative; rightmost axis stays at fixed x so it doesn't shift left -->
     {#each derivativesArray as deriv, idx}
-      {@const axisX = width - padding.right - (derivativesArray.length - 1 - idx) * axisWidth}
+      {@const axisX = width - rightEdgePadding - (derivativesArray.length - 1 - idx) * axisWidth}
       {#each deriv.ticks as tick}
         {@const y = padding.top + chartHeight / 2 - (tick / deriv.maxAbs) * (chartHeight / 2)}
         <text
