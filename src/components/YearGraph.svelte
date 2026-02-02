@@ -8,8 +8,10 @@
   let tooltipX = $state(0);
   let tooltipY = $state(0);
   
-  // SVG dimensions - increased to accommodate labels
+  // SVG dimensions - viewBox includes small padding so labels are never cropped (equinox labels stacked on two lines)
   const size = 480;
+  const padding = 28;
+  const viewBoxSize = size + 2 * padding;
   const center = size / 2;
   const outerRadius = 160;
   const innerRadius = 95;
@@ -18,10 +20,10 @@
   function getDateAtPosition(svg, clientX, clientY) {
     if (!selectedDate) return null;
     const rect = svg.getBoundingClientRect();
-    const scaleX = size / rect.width;
-    const scaleY = size / rect.height;
-    const x = (clientX - rect.left) * scaleX - center;
-    const y = (clientY - rect.top) * scaleY - center;
+    const scaleX = viewBoxSize / rect.width;
+    const scaleY = viewBoxSize / rect.height;
+    const x = (clientX - rect.left) * scaleX - padding - center;
+    const y = (clientY - rect.top) * scaleY - padding - center;
     const distance = Math.sqrt(x * x + y * y);
     if (distance < innerRadius - 10 || distance > outerRadius + 30) return null;
     let angle = Math.atan2(x, -y) * 180 / Math.PI;
@@ -221,11 +223,18 @@
       const angle = event.angle !== null ? event.angle : (daysFromWS / daysInYear) * 360;
       
       const markerPos = polarToCartesian(angle, outerRadius + 8);
-      const labelPos = polarToCartesian(angle, outerRadius + 52);
+      const labelPos = polarToCartesian(angle, outerRadius + 44);
+      
+      const name = getSeasonName(event.northernName, latitude);
+      const isEquinox = event.id === 'mar-equinox' || event.id === 'sep-equinox';
+      const line1 = isEquinox ? name.replace(/\s+Equinox$/, '') : name; // "Spring" or "Autumn"
+      const line2 = isEquinox ? 'Equinox' : null;
       
       return {
         id: event.id,
-        name: getSeasonName(event.northernName, latitude),
+        name,
+        line1,
+        line2,
         date: event.date,
         calculatedAngle: angle,
         markerPos,
@@ -252,19 +261,20 @@
     </label>
   </div>
   
-  <div class="flex flex-1 min-h-0 justify-center">
+  <div class="flex flex-1 min-h-0 min-w-0 w-full overflow-hidden">
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
     <svg 
-      viewBox="0 0 {size} {size}" 
-      class="w-full max-w-xl cursor-pointer outline-none"
-      style="max-height: 520px;"
+      viewBox="0 0 {viewBoxSize} {viewBoxSize}" 
+      class="min-w-0 min-h-0 w-full h-full max-w-full cursor-pointer outline-none aspect-square object-contain"
+      preserveAspectRatio="xMidYMid meet"
       onclick={handleRingClick}
       onmousemove={handleRingMouseMove}
       onmouseleave={handleRingMouseLeave}
       role="img"
       aria-label="Year graph showing daylight throughout the year. Click to select a date."
     >
+      <g transform="translate({padding}, {padding})">
       <!-- Ring segments (daylight visualization) -->
       {#each ringSegments as segment}
         <path
@@ -309,9 +319,9 @@
         </text>
       {/each}
       
-      <!-- Solstice and Equinox markers (clickable to select that date) -->
+      <!-- Solstice and Equinox markers (clickable to select that date); equinox = two stacked lines -->
       {#each astronomicalMarkers as marker}
-        {@const yOffset = marker.id === 'mar-equinox' ? 30 : 0}
+        {@const yOffset = marker.id === 'mar-equinox' ? 20 : 0}
         <g
           role="button"
           tabindex="0"
@@ -331,24 +341,56 @@
               rx="1"
             />
           </g>
-          <text
-            x={marker.labelPos.x}
-            y={marker.labelPos.y - 8 + yOffset}
-            text-anchor="middle"
-            class="fill-gray-700 dark:fill-gray-300 font-semibold"
-            font-size="13"
-          >
-            {marker.name}
-          </text>
-          <text
-            x={marker.labelPos.x}
-            y={marker.labelPos.y + 8 + yOffset}
-            text-anchor="middle"
-            class="fill-gray-500 dark:fill-gray-400"
-            font-size="12"
-          >
-            {marker.dateStr}
-          </text>
+          {#if marker.line2}
+            <!-- Equinox: "Spring"/"Autumn" on first line, "Equinox" on second -->
+            <text
+              x={marker.labelPos.x}
+              y={marker.labelPos.y - 14 + yOffset}
+              text-anchor="middle"
+              class="fill-gray-700 dark:fill-gray-300 font-semibold"
+              font-size="12"
+            >
+              {marker.line1}
+            </text>
+            <text
+              x={marker.labelPos.x}
+              y={marker.labelPos.y + yOffset}
+              text-anchor="middle"
+              class="fill-gray-700 dark:fill-gray-300 font-semibold"
+              font-size="12"
+            >
+              {marker.line2}
+            </text>
+            <text
+              x={marker.labelPos.x}
+              y={marker.labelPos.y + 16 + yOffset}
+              text-anchor="middle"
+              class="fill-gray-500 dark:fill-gray-400"
+              font-size="11"
+            >
+              {marker.dateStr}
+            </text>
+          {:else}
+            <!-- Solstice: single line -->
+            <text
+              x={marker.labelPos.x}
+              y={marker.labelPos.y - 8 + yOffset}
+              text-anchor="middle"
+              class="fill-gray-700 dark:fill-gray-300 font-semibold"
+              font-size="13"
+            >
+              {marker.line1}
+            </text>
+            <text
+              x={marker.labelPos.x}
+              y={marker.labelPos.y + 8 + yOffset}
+              text-anchor="middle"
+              class="fill-gray-500 dark:fill-gray-400"
+              font-size="12"
+            >
+              {marker.dateStr}
+            </text>
+          {/if}
         </g>
       {/each}
       
@@ -414,6 +456,7 @@
           </text>
         </g>
       {/if}
+      </g>
     </svg>
   </div>
   
