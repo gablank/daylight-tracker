@@ -1,10 +1,9 @@
 <script>
-  import { computeYearData, getSunData, findOppositeDate } from './lib/solar.js';
-  import { getToday, getLocalTimezone } from './lib/utils.js';
+  import { computeYearData, getSunData, findOppositeDate, formatDateShort, formatDuration } from './lib/solar.js';
+  import { getToday, getLocalTimezone, formatTimeInTimezone } from './lib/utils.js';
   
   import LatitudeSelector from './components/LatitudeSelector.svelte';
   import DatePicker from './components/DatePicker.svelte';
-  import TodaySun from './components/TodaySun.svelte';
   import YearGraph from './components/YearGraph.svelte';
   import DaylightChart from './components/DaylightChart.svelte';
   import SunPathChart from './components/SunPathChart.svelte';
@@ -86,53 +85,78 @@
   let oppositeDate = $derived(findOppositeDate(selectedDate, yearData));
 </script>
 
-<div class="min-h-screen bg-gray-100 dark:bg-gray-900 py-8 px-4">
-  <div class="max-w-7xl mx-auto">
-    <!-- Header -->
-    <header class="text-center mb-8">
-      <h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
-        Daylight Tracker
-      </h1>
-      <p class="text-gray-600 dark:text-gray-400">
-        Explore how daylight changes throughout the year at your location
-      </p>
-    </header>
-    
-    <!-- Sun Today (full width, horizontal) -->
-    <div class="mb-6">
-      <TodaySun {sunData} {timezone} />
-    </div>
-    
-    <!-- Settings (full width, collapsible, below Sun today) -->
-    <div class="mb-6">
-      <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
+<div class="min-h-screen bg-gray-100 dark:bg-gray-900">
+  <!-- Sticky bar: selected day summary + settings toggle -->
+  <div
+    class="sticky top-0 z-50 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm"
+    role="banner"
+  >
+    <div class="max-w-7xl mx-auto px-4 py-3">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="flex flex-wrap items-center gap-4 sm:gap-6">
+          <h1 class="text-lg font-bold text-gray-900 dark:text-gray-100 shrink-0">
+            Daylight Tracker
+          </h1>
+          {#if sunData}
+            <div class="flex flex-wrap items-center gap-3 sm:gap-5 text-sm">
+              <span class="font-medium text-gray-700 dark:text-gray-300 shrink-0">
+                {formatDateShort(selectedDate)}
+              </span>
+              <span class="text-gray-500 dark:text-gray-400">
+                Sunrise
+                <span class="ml-1 font-medium text-gray-900 dark:text-gray-100">
+                  {#if sunData.isPolarNight}—
+                  {:else if sunData.isPolarDay}Always up
+                  {:else}{formatTimeInTimezone(sunData.sunrise, timezone)}{/if}
+                </span>
+              </span>
+              <span class="text-gray-500 dark:text-gray-400">
+                Sunset
+                <span class="ml-1 font-medium text-gray-900 dark:text-gray-100">
+                  {#if sunData.isPolarNight}—
+                  {:else if sunData.isPolarDay}Never sets
+                  {:else}{formatTimeInTimezone(sunData.sunset, timezone)}{/if}
+                </span>
+              </span>
+              <span class="text-gray-500 dark:text-gray-400">
+                Daylight
+                <span class="ml-1 font-medium text-gray-900 dark:text-gray-100">
+                  {#if sunData.isPolarNight}0h 0m
+                  {:else if sunData.isPolarDay}24h 0m
+                  {:else}{formatDuration(sunData.daylight)}{/if}
+                </span>
+              </span>
+            </div>
+          {/if}
+        </div>
         <button
           type="button"
-          class="w-full flex items-center justify-between gap-2 px-4 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+          class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shrink-0"
           onclick={() => settingsExpanded = !settingsExpanded}
           aria-expanded={settingsExpanded}
+          aria-label={settingsExpanded ? 'Close settings' : 'Open settings'}
         >
-          <span>Location & date</span>
-          <svg
-            class="w-5 h-5 shrink-0 transition-transform {settingsExpanded ? 'rotate-180' : ''}"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-          >
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          <svg class="w-5 h-5 shrink-0 transition-transform {settingsExpanded ? 'rotate-90' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
+          <span>{settingsExpanded ? 'Close settings' : 'Settings'}</span>
         </button>
-        {#if settingsExpanded}
-          <div class="border-t border-gray-200 dark:border-gray-700 p-4 space-y-4">
-            <LatitudeSelector bind:latitude bind:longitude bind:timezone />
-            <hr class="border-gray-200 dark:border-gray-700" />
-            <DatePicker bind:selectedDate {latitude} {longitude} {timezone} />
-          </div>
-        {/if}
       </div>
     </div>
-    
+    <!-- Settings panel (collapsible, below bar when expanded) -->
+    {#if settingsExpanded}
+      <div class="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/80 px-4 py-4">
+        <div class="max-w-7xl mx-auto space-y-4">
+          <LatitudeSelector bind:latitude bind:longitude bind:timezone />
+          <hr class="border-gray-200 dark:border-gray-700" />
+          <DatePicker bind:selectedDate {latitude} {longitude} {timezone} />
+        </div>
+      </div>
+    {/if}
+  </div>
+
+  <div class="max-w-7xl mx-auto px-4 py-8">
     <!-- Year overview (left, full height) | Daylight chart + Sun path (right, stacked 50/50) -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6 min-h-[520px]">
       <YearGraph 
