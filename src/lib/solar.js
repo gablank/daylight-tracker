@@ -500,8 +500,9 @@ export function getUpcomingAstronomicalEvents(currentDate, latitude = 0, count =
     ...eventDefs.map((e) => ({ northernName: e.northernName, date: e.getDate(year + 1) })),
   ].sort((a, b) => a.date.getTime() - b.date.getTime());
 
+  const startOfSelectedDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
   for (const event of allEvents) {
-    if (event.date > currentDate && events.length < count) {
+    if (event.date >= startOfSelectedDay && events.length < count) {
       events.push({
         name: getSeasonName(event.northernName, latitude),
         date: event.date
@@ -555,8 +556,9 @@ export function findUpcomingDaylightMilestones(currentDate, yearData, latitude, 
   
   // FIRST PASS: Pre-scan the entire year for extreme events
   // Use both threshold-based detection AND isPolarDay/isPolarNight flags for reliability
+  // Start at offset 0 so transitions on the selected date (e.g. today) are included
   const extremeEvents = [];
-  for (let offset = 1; offset < yearData.length; offset++) {
+  for (let offset = 0; offset < yearData.length; offset++) {
     const prevData = getDataAtOffset(offset - 1);
     const currData = getDataAtOffset(offset);
     if (!prevData || !currData) continue;
@@ -633,11 +635,11 @@ export function findUpcomingDaylightMilestones(currentDate, yearData, latitude, 
     return false;
   };
   
-  // SECOND PASS: Collect milestones
+  // SECOND PASS: Collect milestones (offset 0 = selected date, e.g. today)
   const milestones = [];
   const foundCrossings = new Set();
   
-  for (let offset = 1; offset < yearData.length && milestones.length < count; offset++) {
+  for (let offset = 0; offset < yearData.length && milestones.length < count; offset++) {
     const prevData = getDataAtOffset(offset - 1);
     const currData = getDataAtOffset(offset);
     if (!prevData || !currData) continue;
@@ -803,11 +805,14 @@ export function findUpcomingSunriseMilestones(currentDate, latitude, longitude, 
   const milestones = [];
   const isExtremeLatitude = Math.abs(latitude) > 66.5;
   
-  const initialSunData = getSunData(currentDate, latitude, longitude);
+  // Start from day before selected date so events on the selected date (e.g. today) are included
+  const dayBefore = new Date(currentDate);
+  dayBefore.setDate(dayBefore.getDate() - 1);
+  const initialSunData = getSunData(dayBefore, latitude, longitude);
   let prevHours = getSunriseDecimalHours(initialSunData, timezone);
   
-  // Search up to 365 days forward
-  for (let offset = 1; offset <= 365 && milestones.length < count; offset++) {
+  // Search from selected date (offset 0) up to 365 days forward
+  for (let offset = 0; offset <= 365 && milestones.length < count; offset++) {
     const calendarDate = new Date(currentDate);
     calendarDate.setDate(calendarDate.getDate() + offset);
     
@@ -890,11 +895,14 @@ export function findUpcomingSunsetMilestones(currentDate, latitude, longitude, t
   const milestones = [];
   const isExtremeLatitude = Math.abs(latitude) > 66.5;
   
-  const initialSunData = getSunData(currentDate, latitude, longitude);
+  // Start from day before selected date so events on the selected date (e.g. today) are included
+  const dayBefore = new Date(currentDate);
+  dayBefore.setDate(dayBefore.getDate() - 1);
+  const initialSunData = getSunData(dayBefore, latitude, longitude);
   let prevHours = getSunsetDecimalHours(initialSunData, timezone);
   
-  // Search up to 365 days forward
-  for (let offset = 1; offset <= 365 && milestones.length < count; offset++) {
+  // Search from selected date (offset 0) up to 365 days forward
+  for (let offset = 0; offset <= 365 && milestones.length < count; offset++) {
     const calendarDate = new Date(currentDate);
     calendarDate.setDate(calendarDate.getDate() + offset);
     
