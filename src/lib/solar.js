@@ -866,17 +866,25 @@ function formatTimeInTz(date, timezone) {
 export function findUpcomingDSTChanges(currentDate, timezone, latitude, longitude, count = 2) {
   const transitions = [];
   
-  let prevOffset = getTimezoneOffset(currentDate, timezone);
+  // Get noon offset for the day before we start searching
+  const startDate = new Date(currentDate);
+  startDate.setDate(startDate.getDate() - 1);
+  let prevNoon = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), 12, 0, 0);
+  let prevNoonOffset = getTimezoneOffset(prevNoon, timezone);
   
   // Search up to 400 days forward (to catch at least one full year)
-  for (let offset = 1; offset <= 400 && transitions.length < count; offset++) {
+  for (let offset = 0; offset <= 400 && transitions.length < count; offset++) {
     const date = new Date(currentDate);
     date.setDate(date.getDate() + offset);
     
-    const currOffset = getTimezoneOffset(date, timezone);
+    // Check offset at noon - safely after any early-morning DST change
+    // (DST changes universally happen in early morning: 01:00-03:00)
+    const noon = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0);
+    const noonOffset = getTimezoneOffset(noon, timezone);
     
-    if (prevOffset !== null && currOffset !== null && prevOffset !== currOffset) {
-      const offsetChange = currOffset - prevOffset;
+    if (prevNoonOffset !== null && noonOffset !== null && prevNoonOffset !== noonOffset) {
+      // Offset changed between yesterday noon and today noon → DST changed today
+      const offsetChange = noonOffset - prevNoonOffset;
       let description;
       
       if (offsetChange > 0) {
@@ -900,7 +908,7 @@ export function findUpcomingDSTChanges(currentDate, timezone, latitude, longitud
       });
     }
     
-    prevOffset = currOffset;
+    prevNoonOffset = noonOffset;
   }
   
   return transitions;
