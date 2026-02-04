@@ -1,5 +1,5 @@
 <script>
-  import { getDateAngle, formatDateShort, formatDuration, getDaysInYear, getWinterSolstice, getDayOfYear, getSeasonName, getDayStatsForTooltip } from '../lib/solar.js';
+  import { getDateAngle, formatDateShort, formatDuration, getDaysInYear, getWinterSolstice, getSummerSolstice, getMarchEquinox, getSeptemberEquinox, getDayOfYear, getSeasonName, getDayStatsForTooltip } from '../lib/solar.js';
   
   let { selectedDate, yearData, oppositeDate, latitude = 0, longitude = 0, timezone = null, hoveredDate = null, onHoverDate = null, onDateSelect = null } = $props();
   
@@ -232,10 +232,10 @@
     // Northern hemisphere names - will be swapped for southern hemisphere
     // id is used for positioning (e.g., March equinox needs y-offset regardless of name)
     const events = [
-      { id: 'dec-solstice', northernName: 'Winter Solstice', date: new Date(year, 11, 21), angle: 0 },
-      { id: 'mar-equinox', northernName: 'Spring Equinox', date: new Date(year, 2, 20), angle: null },
-      { id: 'jun-solstice', northernName: 'Summer Solstice', date: new Date(year, 5, 21), angle: 180 },
-      { id: 'sep-equinox', northernName: 'Autumn Equinox', date: new Date(year, 8, 22), angle: null },
+      { id: 'dec-solstice', northernName: 'Winter Solstice', date: getWinterSolstice(year), angle: 0 },
+      { id: 'mar-equinox', northernName: 'Spring Equinox', date: getMarchEquinox(year), angle: null },
+      { id: 'jun-solstice', northernName: 'Summer Solstice', date: getSummerSolstice(year), angle: 180 },
+      { id: 'sep-equinox', northernName: 'Autumn Equinox', date: getSeptemberEquinox(year), angle: null },
     ];
     
     return events.map(event => {
