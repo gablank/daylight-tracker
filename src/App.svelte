@@ -165,6 +165,14 @@
         </div>
         <button
           type="button"
+          class="px-3 py-2 rounded-lg text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 focus:outline-none focus:ring-2 focus:ring-blue-500 shrink-0"
+          onclick={() => selectedDate = getToday()}
+          aria-label="Reset to today"
+        >
+          Today
+        </button>
+        <button
+          type="button"
           class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shrink-0"
           onclick={() => settingsExpanded = !settingsExpanded}
           aria-expanded={settingsExpanded}
