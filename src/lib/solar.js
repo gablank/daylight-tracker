@@ -161,11 +161,17 @@ export function computeYearData(latitude, year) {
 /**
  * Find the opposite date (mirror date) - the date with the same amount of daylight
  * as the selected date, on the other half of the year.
+ * Uses a fixed latitude (45°) so the mirror date is consistent regardless of user location.
  * @param {Date} currentDate - The current date
- * @param {Array} yearData - The precomputed year data (from computeYearData)
  * @returns {Object|null} Object with date property for the mirror date, or null if not found
  */
-export function findOppositeDate(currentDate, yearData) {
+export function findOppositeDate(currentDate) {
+  const year = currentDate.getFullYear();
+  
+  // Use fixed latitude of 45° for consistent mirror dates across all locations
+  const MIRROR_LATITUDE = 45;
+  const yearData = computeYearData(MIRROR_LATITUDE, year);
+  
   if (!yearData || yearData.length === 0) return null;
 
   const daysInYear = yearData.length;
@@ -173,8 +179,6 @@ export function findOppositeDate(currentDate, yearData) {
   const currentData = yearData[currentDOY - 1];
   if (!currentData) return null;
 
-  const targetDaylight = currentData.daylight;
-  const year = currentDate.getFullYear();
   const summerSolsticeDOY = getDayOfYear(getSummerSolstice(year));
 
   // Other half = opposite side of summer solstice (same-daylight pairs are symmetric around it).
@@ -191,7 +195,7 @@ export function findOppositeDate(currentDate, yearData) {
     if (doy === currentDOY) continue; // never pick the same day as its own mirror
     const data = yearData[doy - 1];
     if (!data) continue;
-    const diff = Math.abs(data.daylight - targetDaylight);
+    const diff = Math.abs(data.daylight - currentData.daylight);
     if (diff < bestDiff) {
       bestDiff = diff;
       bestDOY = doy;

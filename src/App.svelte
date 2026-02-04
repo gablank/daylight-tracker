@@ -82,7 +82,8 @@
   let sunData = $derived(getSunData(selectedDate, latitude, longitude));
   
   // Mirror date: the date with the same amount of daylight on the other half of the year
-  let oppositeDate = $derived(findOppositeDate(selectedDate, yearData));
+  // Uses fixed latitude (45°) so the mirror date is consistent regardless of user location
+  let oppositeDate = $derived(findOppositeDate(selectedDate));
 </script>
 
 <div class="min-h-screen bg-gray-100 dark:bg-gray-900">
