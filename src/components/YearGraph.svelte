@@ -1,12 +1,12 @@
 <script>
   import { getDateAngle, formatDateShort, formatDuration, getDaysInYear, getWinterSolstice, getDayOfYear, getSeasonName, getDayStatsForTooltip } from '../lib/solar.js';
   
-  let { selectedDate, yearData, oppositeDate, latitude = 0, longitude = 0, timezone = null, onDateSelect = null } = $props();
+  let { selectedDate, yearData, oppositeDate, latitude = 0, longitude = 0, timezone = null, hoveredDate = null, onHoverDate = null, onDateSelect = null } = $props();
   
-  // Hover tooltip: date under cursor and screen position
-  let hoveredDate = $state(null);
+  // Tooltip screen position (hoveredDate comes from prop for cross-component sync)
   let tooltipX = $state(0);
   let tooltipY = $state(0);
+  let isHovering = $state(false); // Track if mouse is over this component (for tooltip visibility)
   
   // SVG dimensions - viewBox includes small padding so labels are never cropped (equinox labels stacked on two lines)
   const size = 480;
@@ -43,12 +43,13 @@
     if (!onDateSelect || !selectedDate) return;
     const date = getDateAtPosition(event.currentTarget, event.clientX, event.clientY);
     if (date) onDateSelect(date);
-    hoveredDate = null;
+    onHoverDate?.(null);
   }
   
   function handleRingMouseMove(event) {
     const date = getDateAtPosition(event.currentTarget, event.clientX, event.clientY);
-    hoveredDate = date;
+    onHoverDate?.(date);
+    isHovering = true;
     if (date) {
       tooltipX = event.clientX;
       tooltipY = event.clientY;
@@ -56,7 +57,8 @@
   }
   
   function handleRingMouseLeave() {
-    hoveredDate = null;
+    onHoverDate?.(null);
+    isHovering = false;
   }
   
   // Load from localStorage, default to clockwise (true)
@@ -78,7 +80,7 @@
 
   // Clear hover/tooltip on scroll or touchmove so it doesn't stick on mobile
   $effect(() => {
-    const clear = () => { hoveredDate = null; };
+    const clear = () => { onHoverDate?.(null); isHovering = false; };
     window.addEventListener('scroll', clear, true);
     window.addEventListener('touchmove', clear, true);
     return () => {
@@ -110,6 +112,14 @@
   let oppositePosition = $derived(
     oppositeAngle !== null 
       ? polarToCartesian(oppositeAngle, (outerRadius + innerRadius) / 2)
+      : null
+  );
+  
+  // Hover date angle and position (for cross-component hover sync)
+  let hoverAngle = $derived(hoveredDate && selectedDate ? getDateAngle(hoveredDate, selectedDate.getFullYear()) : null);
+  let hoverPosition = $derived(
+    hoverAngle !== null
+      ? polarToCartesian(hoverAngle, (outerRadius + innerRadius) / 2)
       : null
   );
   
@@ -406,6 +416,14 @@
         </g>
       {/each}
       
+      <!-- Hover date marker (for cross-component hover sync) -->
+      {#if hoverPosition}
+        <g transform="translate({hoverPosition.x}, {hoverPosition.y})">
+          <circle r="8" class="fill-white dark:fill-gray-800" opacity="0.9" />
+          <circle r="6" class="fill-blue-400 dark:fill-blue-500" opacity="0.9" />
+        </g>
+      {/if}
+      
       <!-- Opposite date marker -->
       {#if oppositePosition}
         <g transform="translate({oppositePosition.x}, {oppositePosition.y})">
@@ -472,8 +490,8 @@
     </svg>
   </div>
   
-  <!-- Hover tooltip: day stats -->
-  {#if hoveredDate}
+  <!-- Hover tooltip: day stats (only show when hovering directly on this component) -->
+  {#if hoveredDate && isHovering}
     {@const stats = getDayStatsForTooltip(hoveredDate, latitude, longitude, timezone)}
     <div
       class="fixed z-50 px-2 py-1.5 text-xs rounded shadow-lg bg-gray-800 text-gray-100 dark:bg-gray-700 dark:text-gray-200 pointer-events-none"

@@ -21,6 +21,9 @@
   let settingsExpanded = $state(true);
   let settingsLoaded = $state(false);
   
+  // Global hover state - shared across YearGraph, DaylightChart, and other components
+  let globalHoveredDate = $state(null);
+  
   // Load settings from localStorage on mount (selectedDate always defaults to today)
   $effect(() => {
     if (settingsLoaded) return;
@@ -197,6 +200,8 @@
         {latitude} 
         {longitude} 
         {timezone} 
+        hoveredDate={globalHoveredDate}
+        onHoverDate={(date) => globalHoveredDate = date}
         onDateSelect={(date) => selectedDate = date}
       />
       <div class="flex flex-col gap-6 min-h-0">
@@ -208,6 +213,8 @@
             {latitude}
             {longitude}
             {timezone}
+            hoveredDate={globalHoveredDate}
+            onHoverDate={(date) => globalHoveredDate = date}
             onDateSelect={(date) => selectedDate = date}
           />
         </div>
@@ -219,8 +226,8 @@
     
     <!-- Bottom section: Stats and Upcoming Dates side by side -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <StatsTable {selectedDate} {yearData} {latitude} {longitude} {oppositeDate} {timezone} onDateSelect={(date) => selectedDate = date} />
-      <UpcomingDates {selectedDate} {yearData} {latitude} {longitude} {timezone} onDateSelect={(date) => selectedDate = date} />
+      <StatsTable {selectedDate} {yearData} {latitude} {longitude} {oppositeDate} {timezone} onDateSelect={(date) => selectedDate = date} onHoverDate={(date) => globalHoveredDate = date} />
+      <UpcomingDates {selectedDate} {yearData} {latitude} {longitude} {timezone} onDateSelect={(date) => selectedDate = date} onHoverDate={(date) => globalHoveredDate = date} />
     </div>
     
     <!-- Footer -->

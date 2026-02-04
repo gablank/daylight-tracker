@@ -2,11 +2,17 @@
   import { formatDuration, formatDateShort, getSunData, findDateWithGain, getDayOfYear, getDayStatsForTooltip } from '../lib/solar.js';
   import { addDays, formatDurationChange } from '../lib/utils.js';
   
-  let { selectedDate, yearData, latitude, oppositeDate, longitude = 0, timezone = null, onDateSelect = null } = $props();
+  let { selectedDate, yearData, latitude, oppositeDate, longitude = 0, timezone = null, onDateSelect = null, onHoverDate = null } = $props();
 
   let hoveredDate = $state(null);
   let tooltipX = $state(0);
   let tooltipY = $state(0);
+  
+  // Sync local hover with global hover for cross-component markers
+  function setHovered(date) {
+    hoveredDate = date;
+    onHoverDate?.(date);
+  }
   
   // Section 0: Mirror/Opposite date info
   let mirrorDateInfo = $derived.by(() => {
@@ -85,7 +91,7 @@
 
   // Clear hover/tooltip on scroll or touchmove so it doesn't stick on mobile
   $effect(() => {
-    const clear = () => { hoveredDate = null; };
+    const clear = () => { setHovered(null); };
     window.addEventListener('scroll', clear, true);
     window.addEventListener('touchmove', clear, true);
     return () => {
@@ -109,10 +115,10 @@
           <button
             type="button"
             class="font-semibold text-orange-600 dark:text-orange-400 cursor-pointer hover:underline focus:outline-none focus:ring-2 focus:ring-orange-400 rounded px-0.5 -mx-0.5"
-            onclick={() => { hoveredDate = null; onDateSelect?.(mirrorDateInfo.dateObj); }}
-            onmouseenter={(e) => { hoveredDate = mirrorDateInfo.dateObj; tooltipX = e.clientX; tooltipY = e.clientY; }}
+            onclick={() => { setHovered(null); onDateSelect?.(mirrorDateInfo.dateObj); }}
+            onmouseenter={(e) => { setHovered(mirrorDateInfo.dateObj); tooltipX = e.clientX; tooltipY = e.clientY; }}
             onmousemove={(e) => { tooltipX = e.clientX; tooltipY = e.clientY; }}
-            onmouseleave={() => hoveredDate = null}
+            onmouseleave={() => setHovered(null)}
           >
             {mirrorDateInfo.date}
           </button>
@@ -144,16 +150,16 @@
             {#each futureDaylight as row}
               <tr
                 class="border-b border-gray-100 dark:border-gray-700/50"
-                onmouseenter={(e) => { hoveredDate = row.dateObj; tooltipX = e.clientX; tooltipY = e.clientY; }}
+                onmouseenter={(e) => { setHovered(row.dateObj); tooltipX = e.clientX; tooltipY = e.clientY; }}
                 onmousemove={(e) => { tooltipX = e.clientX; tooltipY = e.clientY; }}
-                onmouseleave={() => hoveredDate = null}
+                onmouseleave={() => setHovered(null)}
               >
                 <td class="py-1.5 pr-3 text-gray-900 dark:text-gray-100">{row.label}</td>
                 <td class="py-1.5 pr-3 text-gray-600 dark:text-gray-400 text-xs">
                   <button
                     type="button"
                     class="cursor-pointer hover:underline focus:outline-none focus:ring-2 focus:ring-orange-400 rounded px-0.5 -mx-0.5 text-left"
-                    onclick={() => { hoveredDate = null; onDateSelect?.(row.dateObj); }}
+                    onclick={() => { setHovered(null); onDateSelect?.(row.dateObj); }}
                   >
                     {row.date}
                   </button>
@@ -187,9 +193,9 @@
             {#each daylightChanges as row}
               <tr
                 class="border-b border-gray-100 dark:border-gray-700/50"
-                onmouseenter={(e) => { if (row.dateObj) { hoveredDate = row.dateObj; tooltipX = e.clientX; tooltipY = e.clientY; } }}
+                onmouseenter={(e) => { if (row.dateObj) { setHovered(row.dateObj); tooltipX = e.clientX; tooltipY = e.clientY; } }}
                 onmousemove={(e) => { if (row.dateObj) { tooltipX = e.clientX; tooltipY = e.clientY; } }}
-                onmouseleave={() => hoveredDate = null}
+                onmouseleave={() => setHovered(null)}
               >
                 <td class="py-1.5 pr-3 font-medium {row.isGain ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}">{row.label}</td>
                 <td class="py-1.5 pr-3 text-gray-600 dark:text-gray-400">
@@ -197,7 +203,7 @@
                     <button
                       type="button"
                       class="cursor-pointer hover:underline focus:outline-none focus:ring-2 focus:ring-orange-400 rounded px-0.5 -mx-0.5 text-left"
-                      onclick={() => { hoveredDate = null; onDateSelect?.(row.dateObj); }}
+                      onclick={() => { setHovered(null); onDateSelect?.(row.dateObj); }}
                     >
                       {row.date}
                     </button>

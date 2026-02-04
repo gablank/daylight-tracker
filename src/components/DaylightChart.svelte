@@ -2,11 +2,12 @@
   import { getDayOfYear, getDaysInYear, getDayStatsForTooltip } from '../lib/solar.js';
   import { formatDurationChangeMinutesSeconds } from '../lib/utils.js';
 
-  let { yearData, selectedDate, latitude = 0, longitude = 0, timezone = null, onDateSelect = null, derivativeCount = $bindable(1) } = $props();
+  let { yearData, selectedDate, latitude = 0, longitude = 0, timezone = null, hoveredDate = null, onHoverDate = null, onDateSelect = null, derivativeCount = $bindable(1) } = $props();
 
-  let hoveredDate = $state(null);
+  // Tooltip screen position (hoveredDate comes from prop for cross-component sync)
   let tooltipX = $state(0);
   let tooltipY = $state(0);
+  let isHovering = $state(false); // Track if mouse is over this component (for tooltip visibility)
 
   const width = 600;
   const height = 300;
@@ -118,6 +119,15 @@
     return padding.left + ((doy - 1) / Math.max(daysInYear - 1, 1)) * chartWidth;
   });
 
+  // Hovered date vertical line position (for cross-component hover sync)
+  let hoveredDateX = $derived.by(() => {
+    if (!hoveredDate || !selectedDate || !yearData || yearData.length === 0) return null;
+    const doy = getDayOfYear(hoveredDate);
+    const year = selectedDate.getFullYear();
+    const daysInYear = getDaysInYear(year);
+    return padding.left + ((doy - 1) / Math.max(daysInYear - 1, 1)) * chartWidth;
+  });
+
   // Rate of change at selected day: centered difference (tomorrow - yesterday)/2 so solstice shows ~0
   let daylightChangeLabel = $derived.by(() => {
     if (!selectedDate || !yearData || yearData.length === 0) return null;
@@ -156,12 +166,13 @@
     if (!onDateSelect || !selectedDate || !yearData?.length) return;
     const newDate = getDateAtX(event.currentTarget, event.clientX);
     if (newDate) onDateSelect(newDate);
-    hoveredDate = null;
+    onHoverDate?.(null);
   }
 
   function handleChartMouseMove(event) {
     const date = getDateAtX(event.currentTarget, event.clientX);
-    hoveredDate = date;
+    onHoverDate?.(date);
+    isHovering = true;
     if (date) {
       tooltipX = event.clientX;
       tooltipY = event.clientY;
@@ -169,12 +180,13 @@
   }
 
   function handleChartMouseLeave() {
-    hoveredDate = null;
+    onHoverDate?.(null);
+    isHovering = false;
   }
 
   // Clear hover/tooltip on scroll or touchmove so it doesn't stick on mobile
   $effect(() => {
-    const clear = () => { hoveredDate = null; };
+    const clear = () => { onHoverDate?.(null); isHovering = false; };
     window.addEventListener('scroll', clear, true);
     window.addEventListener('touchmove', clear, true);
     return () => {
@@ -333,6 +345,19 @@
       {/if}
     {/each}
 
+    <!-- Hovered date vertical line (for cross-component hover sync) -->
+    {#if hoveredDateX !== null}
+      <line
+        x1={hoveredDateX}
+        y1={padding.top}
+        x2={hoveredDateX}
+        y2={padding.top + chartHeight}
+        stroke="rgb(59, 130, 246)"
+        stroke-width="2"
+        stroke-opacity="0.6"
+      />
+    {/if}
+
     <!-- Selected date vertical line -->
     {#if selectedDateX !== null}
       <line
@@ -358,7 +383,8 @@
     {/if}
   </svg>
   </div>
-  {#if hoveredDate}
+  <!-- Hover tooltip: day stats (only show when hovering directly on this component) -->
+  {#if hoveredDate && isHovering}
     {@const stats = getDayStatsForTooltip(hoveredDate, latitude, longitude, timezone)}
     <div
       class="fixed z-50 px-2 py-1.5 text-xs rounded shadow-lg bg-gray-800 text-gray-100 dark:bg-gray-700 dark:text-gray-200 pointer-events-none"

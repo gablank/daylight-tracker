@@ -9,11 +9,17 @@
     findUpcomingDSTChanges
   } from '../lib/solar.js';
   
-  let { selectedDate, yearData, latitude, longitude, timezone, onDateSelect = null } = $props();
+  let { selectedDate, yearData, latitude, longitude, timezone, onDateSelect = null, onHoverDate = null } = $props();
 
   let hoveredGroup = $state(null);
   let tooltipX = $state(0);
   let tooltipY = $state(0);
+  
+  // Helper to set both local and global hover state
+  function setHoveredGroup(group) {
+    hoveredGroup = group;
+    onHoverDate?.(group?.date ?? null);
+  }
   
   // Priority values for sub-sorting within same date (lower = appears first)
   const PRIORITY = {
@@ -202,7 +208,7 @@
 
   // Clear hover/tooltip on scroll or touchmove so it doesn't stick on mobile
   $effect(() => {
-    const clear = () => { hoveredGroup = null; };
+    const clear = () => { setHoveredGroup(null); };
     window.addEventListener('scroll', clear, true);
     window.addEventListener('touchmove', clear, true);
     return () => {
@@ -229,16 +235,16 @@
             {#each group.events as event, eventIdx}
               <tr
                 class="{groupIdx > 0 && eventIdx === 0 ? 'border-t border-gray-300 dark:border-gray-600' : ''}"
-                onmouseenter={() => hoveredGroup = group}
+                onmouseenter={() => setHoveredGroup(group)}
                 onmousemove={(e) => { tooltipX = e.clientX; tooltipY = e.clientY; }}
-                onmouseleave={() => hoveredGroup = null}
+                onmouseleave={() => setHoveredGroup(null)}
               >
                 <td class="py-1.5 pr-4 text-gray-900 dark:text-gray-100 whitespace-nowrap align-top">
                   {#if eventIdx === 0}
                     <button
                       type="button"
                       class="font-medium text-left cursor-pointer hover:underline focus:outline-none focus:ring-2 focus:ring-orange-400 rounded px-0.5 -mx-0.5"
-                      onclick={() => { hoveredGroup = null; onDateSelect?.(group.date); }}
+                      onclick={() => { setHoveredGroup(null); onDateSelect?.(group.date); }}
                     >
                       {formatDateShort(group.date)}
                     </button>
