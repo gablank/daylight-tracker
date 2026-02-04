@@ -20,28 +20,84 @@ export function getDaysInYear(year) {
  */
 export function getDayOfYear(date) {
   const start = new Date(date.getFullYear(), 0, 0);
-  const diff = date - start;
+  const diff = date.getTime() - start.getTime();
   const oneDay = 1000 * 60 * 60 * 24;
   return Math.floor(diff / oneDay);
 }
 
 /**
- * Get the winter solstice date for a given year (Northern Hemisphere)
- * Approximately December 21-22
+ * Julian date (UTC) for a given Date (fractional days since J2000 epoch).
  */
-export function getWinterSolstice(year) {
-  // Winter solstice is typically Dec 21 or 22
-  // We'll calculate it more precisely by finding the day with minimum daylight
-  // For simplicity, use Dec 21 as approximation
-  return new Date(year, 11, 21);
+function julianDate(date) {
+  const ms = date.getTime();
+  return ms / 86400000 + 2440587.5;
 }
 
 /**
- * Get the summer solstice date for a given year (Northern Hemisphere)
- * Approximately June 20-21
+ * Sun's ecliptic longitude in degrees (0–360) for a given Julian date.
+ * Simplified formula from Meeus "Astronomical Algorithms" (Ch 25).
+ */
+function sunEclipticLongitude(jd) {
+  const n = jd - 2451545.0;
+  const L = 280.466 + 0.9856474 * n;
+  const g = (357.528 + 0.9856003 * n) * (Math.PI / 180);
+  let lambda = L + 1.915 * Math.sin(g) + 0.020 * Math.sin(2 * g);
+  lambda = ((lambda % 360) + 360) % 360;
+  return lambda;
+}
+
+/**
+ * Find the UTC moment when the Sun's ecliptic longitude equals the target (0, 90, 180, or 270).
+ * Search window is centered on the approximate calendar date for that event.
+ */
+function findSolsticeEquinoxMoment(year, targetLongitude) {
+  const approxMonth = [2, 5, 8, 11][targetLongitude / 90]; // Mar, Jun, Sep, Dec
+  const approxDay = [20, 21, 22, 21][targetLongitude / 90];
+  let low = new Date(Date.UTC(year, approxMonth, approxDay - 5, 0, 0, 0));
+  let high = new Date(Date.UTC(year, approxMonth, approxDay + 5, 0, 0, 0));
+  for (let i = 0; i < 30; i++) {
+    const mid = new Date((low.getTime() + high.getTime()) / 2);
+    const lambda = sunEclipticLongitude(julianDate(mid));
+    let diff = lambda - targetLongitude;
+    if (diff > 180) diff -= 360;
+    if (diff < -180) diff += 360;
+    if (Math.abs(diff) < 0.0001) return mid;
+    if (diff < 0) low = mid;
+    else high = mid;
+  }
+  return new Date((low.getTime() + high.getTime()) / 2);
+}
+
+/**
+ * Get the winter solstice moment for a given year (Northern Hemisphere).
+ * Returns the exact UTC Date when the Sun's ecliptic longitude is 270°.
+ */
+export function getWinterSolstice(year) {
+  return findSolsticeEquinoxMoment(year, 270);
+}
+
+/**
+ * Get the summer solstice moment for a given year (Northern Hemisphere).
+ * Returns the exact UTC Date when the Sun's ecliptic longitude is 90°.
  */
 export function getSummerSolstice(year) {
-  return new Date(year, 5, 21);
+  return findSolsticeEquinoxMoment(year, 90);
+}
+
+/**
+ * Get the March (vernal/spring) equinox moment for a given year.
+ * Returns the exact UTC Date when the Sun's ecliptic longitude is 0°.
+ */
+export function getMarchEquinox(year) {
+  return findSolsticeEquinoxMoment(year, 0);
+}
+
+/**
+ * Get the September (autumnal) equinox moment for a given year.
+ * Returns the exact UTC Date when the Sun's ecliptic longitude is 180°.
+ */
+export function getSeptemberEquinox(year) {
+  return findSolsticeEquinoxMoment(year, 180);
 }
 
 /**
@@ -433,20 +489,17 @@ export function getSeasonName(northernName, latitude) {
 export function getUpcomingAstronomicalEvents(currentDate, latitude = 0, count = 4) {
   const events = [];
   const year = currentDate.getFullYear();
-  
-  // Define all events for current year and next year (northern hemisphere names)
-  const allEvents = [
-    { northernName: 'Spring Equinox', date: new Date(year, 2, 20) },
-    { northernName: 'Summer Solstice', date: new Date(year, 5, 21) },
-    { northernName: 'Autumn Equinox', date: new Date(year, 8, 22) },
-    { northernName: 'Winter Solstice', date: new Date(year, 11, 21) },
-    { northernName: 'Spring Equinox', date: new Date(year + 1, 2, 20) },
-    { northernName: 'Summer Solstice', date: new Date(year + 1, 5, 21) },
-    { northernName: 'Autumn Equinox', date: new Date(year + 1, 8, 22) },
-    { northernName: 'Winter Solstice', date: new Date(year + 1, 11, 21) },
+  const eventDefs = [
+    { northernName: 'Spring Equinox', getDate: (y) => getMarchEquinox(y) },
+    { northernName: 'Summer Solstice', getDate: (y) => getSummerSolstice(y) },
+    { northernName: 'Autumn Equinox', getDate: (y) => getSeptemberEquinox(y) },
+    { northernName: 'Winter Solstice', getDate: (y) => getWinterSolstice(y) },
   ];
-  
-  // Filter to only future events, with hemisphere-appropriate names
+  const allEvents = [
+    ...eventDefs.map((e) => ({ northernName: e.northernName, date: e.getDate(year) })),
+    ...eventDefs.map((e) => ({ northernName: e.northernName, date: e.getDate(year + 1) })),
+  ].sort((a, b) => a.date.getTime() - b.date.getTime());
+
   for (const event of allEvents) {
     if (event.date > currentDate && events.length < count) {
       events.push({
@@ -455,7 +508,6 @@ export function getUpcomingAstronomicalEvents(currentDate, latitude = 0, count =
       });
     }
   }
-  
   return events;
 }
 
@@ -475,8 +527,13 @@ export function findUpcomingDaylightMilestones(currentDate, yearData, latitude, 
   // Use latitude-dependent thresholds for extreme regions
   // At the poles, SunCalc may report values that don't quite reach 0 or 24 due to refraction
   const isExtremeLatitude = Math.abs(latitude) > 66.5; // Arctic/Antarctic circle
-  const POLAR_NIGHT_THRESHOLD = isExtremeLatitude ? 1.0 : 0.1;  // 1h vs 6 min
-  const MIDNIGHT_SUN_THRESHOLD = isExtremeLatitude ? 23.0 : 23.9; // 23h vs 23h54m
+  // Polar night threshold: daylight below this triggers polar night events
+  // At extreme latitudes, SunCalc may report small daylight values even during polar night
+  const POLAR_NIGHT_THRESHOLD = isExtremeLatitude ? 0.5 : 0.1;  // 30 min vs 6 min
+  // Midnight sun threshold: daylight above this triggers midnight sun events  
+  // The day before true polar day (24h) typically has ~23.9h of daylight
+  // Using 23.9 ensures we catch the actual polar day transition, not just "long days"
+  const MIDNIGHT_SUN_THRESHOLD = isExtremeLatitude ? 23.9 : 23.9; // 23h54m for both
   const SUPPRESSION_WINDOW = isExtremeLatitude ? 60 : 30; // Wider window for polar regions
   
   // Helper to get daylight hours for an offset from current date
@@ -488,27 +545,59 @@ export function findUpcomingDaylightMilestones(currentDate, yearData, latitude, 
     return data ? data.daylight / (1000 * 60 * 60) : null;
   };
   
+  // Helper to get yearData entry for an offset
+  const getDataAtOffset = (offset) => {
+    let doy = currentDOY + offset;
+    if (doy > yearData.length) doy -= yearData.length;
+    if (doy < 1) doy += yearData.length;
+    return yearData[doy - 1] || null;
+  };
+  
   // FIRST PASS: Pre-scan the entire year for extreme events
+  // Use both threshold-based detection AND isPolarDay/isPolarNight flags for reliability
   const extremeEvents = [];
   for (let offset = 1; offset < yearData.length; offset++) {
-    const prevHours = getHoursAtOffset(offset - 1);
-    const currHours = getHoursAtOffset(offset);
-    if (prevHours === null || currHours === null) continue;
+    const prevData = getDataAtOffset(offset - 1);
+    const currData = getDataAtOffset(offset);
+    if (!prevData || !currData) continue;
     
-    // Polar night begins (daylight drops to ~0)
-    if (prevHours >= POLAR_NIGHT_THRESHOLD && currHours < POLAR_NIGHT_THRESHOLD) {
+    const prevHours = prevData.daylight / (1000 * 60 * 60);
+    const currHours = currData.daylight / (1000 * 60 * 60);
+    
+    // Polar night begins: transition from having daylight to isPolarNight
+    // Use flag-based detection for reliability at extreme latitudes
+    if (!prevData.isPolarNight && currData.isPolarNight) {
       extremeEvents.push({ type: 'polar_night_begin', offset, direction: 'decreasing' });
     }
-    // Polar night ends (daylight rises from ~0)
-    if (prevHours < POLAR_NIGHT_THRESHOLD && currHours >= POLAR_NIGHT_THRESHOLD) {
+    // Also catch threshold-based for non-extreme latitudes or SunCalc edge cases
+    else if (prevHours >= POLAR_NIGHT_THRESHOLD && currHours < POLAR_NIGHT_THRESHOLD) {
+      extremeEvents.push({ type: 'polar_night_begin', offset, direction: 'decreasing' });
+    }
+    
+    // Polar night ends: transition from isPolarNight to having daylight
+    if (prevData.isPolarNight && !currData.isPolarNight) {
       extremeEvents.push({ type: 'polar_night_end', offset, direction: 'increasing' });
     }
-    // Midnight sun begins (daylight reaches 24h)
-    if (prevHours <= MIDNIGHT_SUN_THRESHOLD && currHours > MIDNIGHT_SUN_THRESHOLD) {
+    // Also catch threshold-based
+    else if (prevHours < POLAR_NIGHT_THRESHOLD && currHours >= POLAR_NIGHT_THRESHOLD) {
+      extremeEvents.push({ type: 'polar_night_end', offset, direction: 'increasing' });
+    }
+    
+    // Midnight sun begins: transition to isPolarDay (24h daylight)
+    if (!prevData.isPolarDay && currData.isPolarDay) {
       extremeEvents.push({ type: 'midnight_sun_begin', offset, direction: 'increasing' });
     }
-    // Midnight sun ends (daylight drops from 24h)
-    if (prevHours > MIDNIGHT_SUN_THRESHOLD && currHours <= MIDNIGHT_SUN_THRESHOLD) {
+    // Also catch threshold-based for near-polar-day conditions
+    else if (prevHours <= MIDNIGHT_SUN_THRESHOLD && currHours > MIDNIGHT_SUN_THRESHOLD) {
+      extremeEvents.push({ type: 'midnight_sun_begin', offset, direction: 'increasing' });
+    }
+    
+    // Midnight sun ends: transition from isPolarDay to normal
+    if (prevData.isPolarDay && !currData.isPolarDay) {
+      extremeEvents.push({ type: 'midnight_sun_end', offset, direction: 'decreasing' });
+    }
+    // Also catch threshold-based
+    else if (prevHours > MIDNIGHT_SUN_THRESHOLD && currHours <= MIDNIGHT_SUN_THRESHOLD) {
       extremeEvents.push({ type: 'midnight_sun_end', offset, direction: 'decreasing' });
     }
   }
@@ -522,20 +611,22 @@ export function findUpcomingDaylightMilestones(currentDate, yearData, latitude, 
       const daysUntilExtreme = event.offset - offset;
       const daysSinceExtreme = offset - event.offset;
       
-      // Suppress BEFORE an extreme event
-      if (daysUntilExtreme > 0 && daysUntilExtreme <= SUPPRESSION_WINDOW) {
-        // Suppress "Less than Xh" crossings before polar night begins
+      // Suppress ON and BEFORE an extreme event
+      // Using >= 0 to also suppress on the same day as the extreme event itself
+      if (daysUntilExtreme >= 0 && daysUntilExtreme <= SUPPRESSION_WINDOW) {
+        // On/before polar night begins, suppress "Less than Xh" crossings
         if (isDecreasing && event.type === 'polar_night_begin') return true;
-        // Suppress "More than Xh" crossings before midnight sun begins
+        // On/before midnight sun begins, suppress "More than Xh" crossings
         if (!isDecreasing && event.type === 'midnight_sun_begin') return true;
       }
       
-      // Suppress briefly AFTER an extreme event (only during rapid transition, ~7 days)
+      // Suppress ON and briefly AFTER an extreme event (only during rapid transition, ~7 days)
+      // Using >= 0 to also suppress on the same day as the extreme event itself
       // Don't use full SUPPRESSION_WINDOW here as it would hide too many milestones
-      if (daysSinceExtreme > 0 && daysSinceExtreme <= 7) {
-        // After midnight sun ends, briefly suppress "Less than Xh"
+      if (daysSinceExtreme >= 0 && daysSinceExtreme <= 7) {
+        // On/after midnight sun ends, briefly suppress "Less than Xh"
         if (isDecreasing && event.type === 'midnight_sun_end') return true;
-        // After polar night ends, briefly suppress "More than Xh"
+        // On/after polar night ends, briefly suppress "More than Xh"
         if (!isDecreasing && event.type === 'polar_night_end') return true;
       }
     }
@@ -547,41 +638,49 @@ export function findUpcomingDaylightMilestones(currentDate, yearData, latitude, 
   const foundCrossings = new Set();
   
   for (let offset = 1; offset < yearData.length && milestones.length < count; offset++) {
-    const prevHours = getHoursAtOffset(offset - 1);
-    const currHours = getHoursAtOffset(offset);
-    if (prevHours === null || currHours === null) continue;
+    const prevData = getDataAtOffset(offset - 1);
+    const currData = getDataAtOffset(offset);
+    if (!prevData || !currData) continue;
+    
+    const prevHours = prevData.daylight / (1000 * 60 * 60);
+    const currHours = currData.daylight / (1000 * 60 * 60);
     
     const actualDate = new Date(currentDate);
     actualDate.setDate(actualDate.getDate() + offset);
     
     // Add extreme events (these are never suppressed)
+    // Use flag-based detection for reliability, with threshold fallback
+    
     // Polar night begins
-    if (prevHours >= POLAR_NIGHT_THRESHOLD && currHours < POLAR_NIGHT_THRESHOLD) {
-      if (!foundCrossings.has('polar_night_begin')) {
-        foundCrossings.add('polar_night_begin');
-        milestones.push({ date: new Date(actualDate), description: 'Polar night begins (0h daylight)' });
-      }
+    const polarNightBegins = (!prevData.isPolarNight && currData.isPolarNight) ||
+      (prevHours >= POLAR_NIGHT_THRESHOLD && currHours < POLAR_NIGHT_THRESHOLD);
+    if (polarNightBegins && !foundCrossings.has('polar_night_begin')) {
+      foundCrossings.add('polar_night_begin');
+      milestones.push({ date: new Date(actualDate), description: 'Polar night begins (0h daylight)' });
     }
+    
     // Polar night ends
-    if (prevHours < POLAR_NIGHT_THRESHOLD && currHours >= POLAR_NIGHT_THRESHOLD) {
-      if (!foundCrossings.has('polar_night_end')) {
-        foundCrossings.add('polar_night_end');
-        milestones.push({ date: new Date(actualDate), description: 'Polar night ends' });
-      }
+    const polarNightEnds = (prevData.isPolarNight && !currData.isPolarNight) ||
+      (prevHours < POLAR_NIGHT_THRESHOLD && currHours >= POLAR_NIGHT_THRESHOLD);
+    if (polarNightEnds && !foundCrossings.has('polar_night_end')) {
+      foundCrossings.add('polar_night_end');
+      milestones.push({ date: new Date(actualDate), description: 'Polar night ends' });
     }
+    
     // Midnight sun begins
-    if (prevHours <= MIDNIGHT_SUN_THRESHOLD && currHours > MIDNIGHT_SUN_THRESHOLD) {
-      if (!foundCrossings.has('midnight_sun_begin')) {
-        foundCrossings.add('midnight_sun_begin');
-        milestones.push({ date: new Date(actualDate), description: 'Midnight sun begins (24h daylight)' });
-      }
+    const midnightSunBegins = (!prevData.isPolarDay && currData.isPolarDay) ||
+      (prevHours <= MIDNIGHT_SUN_THRESHOLD && currHours > MIDNIGHT_SUN_THRESHOLD);
+    if (midnightSunBegins && !foundCrossings.has('midnight_sun_begin')) {
+      foundCrossings.add('midnight_sun_begin');
+      milestones.push({ date: new Date(actualDate), description: 'Midnight sun begins (24h daylight)' });
     }
+    
     // Midnight sun ends
-    if (prevHours > MIDNIGHT_SUN_THRESHOLD && currHours <= MIDNIGHT_SUN_THRESHOLD) {
-      if (!foundCrossings.has('midnight_sun_end')) {
-        foundCrossings.add('midnight_sun_end');
-        milestones.push({ date: new Date(actualDate), description: 'Midnight sun ends' });
-      }
+    const midnightSunEnds = (prevData.isPolarDay && !currData.isPolarDay) ||
+      (prevHours > MIDNIGHT_SUN_THRESHOLD && currHours <= MIDNIGHT_SUN_THRESHOLD);
+    if (midnightSunEnds && !foundCrossings.has('midnight_sun_end')) {
+      foundCrossings.add('midnight_sun_end');
+      milestones.push({ date: new Date(actualDate), description: 'Midnight sun ends' });
     }
     
     // Check for crossings of each integer hour (1-23)
@@ -702,34 +801,48 @@ function getSunriseDecimalHours(sunData, timezone) {
  */
 export function findUpcomingSunriseMilestones(currentDate, latitude, longitude, timezone, count = 8) {
   const milestones = [];
+  const isExtremeLatitude = Math.abs(latitude) > 66.5;
   
-  let prevSunData = getSunData(currentDate, latitude, longitude);
-  let prevHours = getSunriseDecimalHours(prevSunData, timezone);
+  const initialSunData = getSunData(currentDate, latitude, longitude);
+  let prevHours = getSunriseDecimalHours(initialSunData, timezone);
   
   // Search up to 365 days forward
   for (let offset = 1; offset <= 365 && milestones.length < count; offset++) {
-    const date = new Date(currentDate);
-    date.setDate(date.getDate() + offset);
+    const calendarDate = new Date(currentDate);
+    calendarDate.setDate(calendarDate.getDate() + offset);
     
-    const sunData = getSunData(date, latitude, longitude);
+    const sunData = getSunData(calendarDate, latitude, longitude);
     const currHours = getSunriseDecimalHours(sunData, timezone);
     
-    if (prevHours !== null && currHours !== null) {
-      // Check for crossings of each integer hour (4-12 range is typical for sunrise)
-      for (let h = 3; h <= 12; h++) {
-        // Crossing below (sunrise getting earlier): prev >= h > curr
-        if (prevHours >= h && currHours < h) {
-          milestones.push({
-            date: date,
-            description: `Sunrise at ${String(h).padStart(2, '0')}:00`
-          });
-        }
-        // Crossing above (sunrise getting later): prev < h <= curr
-        if (prevHours < h && currHours >= h) {
-          milestones.push({
-            date: date,
-            description: `Sunrise at ${String(h).padStart(2, '0')}:00`
-          });
+    if (prevHours !== null && currHours !== null && sunData.sunrise) {
+      // Skip hour checks when there's a midnight wrap-around
+      // This avoids false positives during polar transitions
+      const isWrapAround = (prevHours > 20 && currHours < 4) || (prevHours < 4 && currHours > 20);
+      
+      if (!isWrapAround) {
+        // Use actual sunrise date (may differ from calendar date at extreme latitudes)
+        const eventDate = new Date(sunData.sunrise);
+        eventDate.setHours(0, 0, 0, 0);
+        
+        // Hour range to check
+        const minHour = isExtremeLatitude ? 0 : 3;
+        const maxHour = 12;
+        
+        for (let h = minHour; h <= maxHour; h++) {
+          // Getting earlier (sunrise before this hour): prev >= h > curr
+          if (prevHours >= h && currHours < h) {
+            milestones.push({
+              date: eventDate,
+              description: `Sunrise before ${String(h).padStart(2, '0')}:00`
+            });
+          }
+          // Getting later (sunrise after this hour): prev < h <= curr
+          if (prevHours < h && currHours >= h) {
+            milestones.push({
+              date: eventDate,
+              description: `Sunrise after ${String(h).padStart(2, '0')}:00`
+            });
+          }
         }
       }
     }
@@ -775,34 +888,48 @@ function getSunsetDecimalHours(sunData, timezone) {
  */
 export function findUpcomingSunsetMilestones(currentDate, latitude, longitude, timezone, count = 8) {
   const milestones = [];
+  const isExtremeLatitude = Math.abs(latitude) > 66.5;
   
-  let prevSunData = getSunData(currentDate, latitude, longitude);
-  let prevHours = getSunsetDecimalHours(prevSunData, timezone);
+  const initialSunData = getSunData(currentDate, latitude, longitude);
+  let prevHours = getSunsetDecimalHours(initialSunData, timezone);
   
   // Search up to 365 days forward
   for (let offset = 1; offset <= 365 && milestones.length < count; offset++) {
-    const date = new Date(currentDate);
-    date.setDate(date.getDate() + offset);
+    const calendarDate = new Date(currentDate);
+    calendarDate.setDate(calendarDate.getDate() + offset);
     
-    const sunData = getSunData(date, latitude, longitude);
+    const sunData = getSunData(calendarDate, latitude, longitude);
     const currHours = getSunsetDecimalHours(sunData, timezone);
     
-    if (prevHours !== null && currHours !== null) {
-      // Check for crossings of each integer hour (15-22 range is typical for sunset)
-      for (let h = 15; h <= 22; h++) {
-        // Crossing above (sunset getting later): prev < h <= curr
-        if (prevHours < h && currHours >= h) {
-          milestones.push({
-            date: date,
-            description: `Sunset at ${String(h).padStart(2, '0')}:00`
-          });
-        }
-        // Crossing below (sunset getting earlier): prev >= h > curr
-        if (prevHours >= h && currHours < h) {
-          milestones.push({
-            date: date,
-            description: `Sunset at ${String(h).padStart(2, '0')}:00`
-          });
+    if (prevHours !== null && currHours !== null && sunData.sunset) {
+      // Skip hour checks when there's a midnight wrap-around (sunset going from ~23:xx to ~00:xx or vice versa)
+      // This avoids false positives like "Sunset before 23:00" when sunset is actually after midnight
+      const isWrapAround = (prevHours > 20 && currHours < 4) || (prevHours < 4 && currHours > 20);
+      
+      if (!isWrapAround) {
+        // Use actual sunset date (may differ from calendar date at extreme latitudes)
+        const eventDate = new Date(sunData.sunset);
+        eventDate.setHours(0, 0, 0, 0);
+        
+        // Hour range to check
+        const minHour = 15;
+        const maxHour = isExtremeLatitude ? 23 : 22;
+        
+        for (let h = minHour; h <= maxHour; h++) {
+          // Getting later (sunset after this hour): prev < h <= curr
+          if (prevHours < h && currHours >= h) {
+            milestones.push({
+              date: eventDate,
+              description: `Sunset after ${String(h).padStart(2, '0')}:00`
+            });
+          }
+          // Getting earlier (sunset before this hour): prev >= h > curr
+          if (prevHours >= h && currHours < h) {
+            milestones.push({
+              date: eventDate,
+              description: `Sunset before ${String(h).padStart(2, '0')}:00`
+            });
+          }
         }
       }
     }
