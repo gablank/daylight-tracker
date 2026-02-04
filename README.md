@@ -98,6 +98,10 @@ The app handles extreme latitudes (above Arctic/Antarctic circles) with special 
 - Suppressed intermediate milestones during rapid transitions
 - Paired events shown together (e.g., "Midnight sun ends" followed by "Polar night begins")
 
+## Third-Party Licenses
+
+This project uses [SunCalc](https://github.com/mourner/suncalc) for solar calculations. SunCalc is used under the BSD 2-Clause License. The full copyright notice and disclaimer are in [public/THIRD-PARTY-LICENSES.md](public/THIRD-PARTY-LICENSES.md). The same file is included in the built site when deployed (e.g. on GitHub Pages).
+
 ## License
 
 MIT

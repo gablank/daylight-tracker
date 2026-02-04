@@ -244,8 +244,9 @@
     <!-- Footer -->
     <footer class="mt-12 text-center text-sm text-gray-500 dark:text-gray-400">
       <p>
-        Calculations powered by <a href="https://github.com/mourner/suncalc" class="text-blue-600 dark:text-blue-400 hover:underline" target="_blank" rel="noopener">SunCalc</a>. 
+        Calculations powered by <a href="https://github.com/mourner/suncalc" class="text-blue-600 dark:text-blue-400 hover:underline" target="_blank" rel="noopener">SunCalc</a>.
         Atmospheric refraction is included in sunrise/sunset times.
+        <a href="THIRD-PARTY-LICENSES.md" class="text-blue-600 dark:text-blue-400 hover:underline" target="_blank" rel="noopener">Third-party licenses</a>.
       </p>
     </footer>
   </div>
