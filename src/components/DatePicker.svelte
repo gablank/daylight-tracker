@@ -68,10 +68,9 @@
       onclick={setToday}
       disabled={isToday}
       class="flex items-center justify-center gap-2 px-4 py-2 
-             bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-400
-             dark:bg-gray-700 dark:hover:bg-gray-600 dark:disabled:bg-gray-800 dark:disabled:text-gray-500
-             text-gray-700 dark:text-gray-200 font-medium rounded-md transition-colors
-             focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+             bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400
+             text-white font-medium rounded-md transition-colors
+             focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
     >
       <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />

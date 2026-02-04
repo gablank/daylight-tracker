@@ -1,6 +1,6 @@
 <script>
   import { computeYearData, getSunData, findOppositeDate, formatDateShort, formatDuration } from './lib/solar.js';
-  import { getToday, getLocalTimezone, formatTimeInTimezone } from './lib/utils.js';
+  import { getToday, getLocalTimezone, formatTimeInTimezone, formatDateISO } from './lib/utils.js';
   
   import LatitudeSelector from './components/LatitudeSelector.svelte';
   import DatePicker from './components/DatePicker.svelte';
@@ -87,6 +87,8 @@
   // Mirror date: the date with the same amount of daylight on the other half of the year
   // Uses fixed latitude (45°) so the mirror date is consistent regardless of user location
   let oppositeDate = $derived(findOppositeDate(selectedDate));
+  
+  let isToday = $derived(formatDateISO(selectedDate) === formatDateISO(getToday()));
 </script>
 
 <div class="min-h-screen bg-gray-100 dark:bg-gray-900">
@@ -165,9 +167,10 @@
         </div>
         <button
           type="button"
-          class="px-3 py-2 rounded-lg text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 focus:outline-none focus:ring-2 focus:ring-blue-500 shrink-0"
+          disabled={isToday}
+          class="px-3 py-2 rounded-md text-sm font-medium bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shrink-0"
           onclick={() => selectedDate = getToday()}
-          aria-label="Reset to today"
+          aria-label={isToday ? 'Selected date is today' : 'Reset to today'}
         >
           Today
         </button>
