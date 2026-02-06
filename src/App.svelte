@@ -226,6 +226,7 @@
             bind:derivativeCount
             {yearData} 
             {selectedDate} 
+            {oppositeDate}
             {latitude}
             {longitude}
             {timezone}
@@ -238,6 +239,7 @@
           <TwilightChart
             {yearData}
             {selectedDate}
+            {oppositeDate}
             {latitude}
             {longitude}
             {timezone}
@@ -255,6 +257,7 @@
       <SunAzimuthChart
         {yearData}
         {selectedDate}
+        {oppositeDate}
         {latitude}
         {longitude}
         {timezone}

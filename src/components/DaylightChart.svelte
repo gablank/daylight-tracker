@@ -2,7 +2,7 @@
   import { getDayOfYear, getDaysInYear, getDayStatsForTooltip } from '../lib/solar.js';
   import { formatDurationChangeMinutesSeconds } from '../lib/utils.js';
 
-  let { yearData, selectedDate, latitude = 0, longitude = 0, timezone = null, hoveredDate = null, onHoverDate = null, onDateSelect = null, derivativeCount = $bindable(1) } = $props();
+  let { yearData, selectedDate, oppositeDate = null, latitude = 0, longitude = 0, timezone = null, hoveredDate = null, onHoverDate = null, onDateSelect = null, derivativeCount = $bindable(1) } = $props();
 
   // Tooltip screen position (hoveredDate comes from prop for cross-component sync)
   let tooltipX = $state(0);
@@ -114,6 +114,15 @@
   let selectedDateX = $derived.by(() => {
     if (!selectedDate || !yearData || yearData.length === 0) return null;
     const doy = getDayOfYear(selectedDate);
+    const year = selectedDate.getFullYear();
+    const daysInYear = getDaysInYear(year);
+    return padding.left + ((doy - 1) / Math.max(daysInYear - 1, 1)) * chartWidth;
+  });
+
+  // Mirror (opposite) date vertical line position
+  let oppositeDateX = $derived.by(() => {
+    if (!oppositeDate?.date || !yearData || yearData.length === 0) return null;
+    const doy = getDayOfYear(oppositeDate.date);
     const year = selectedDate.getFullYear();
     const daysInYear = getDaysInYear(year);
     return padding.left + ((doy - 1) / Math.max(daysInYear - 1, 1)) * chartWidth;
@@ -343,6 +352,20 @@
         />
       {/if}
     {/each}
+
+    <!-- Mirror date vertical line -->
+    {#if oppositeDateX !== null}
+      <line
+        x1={oppositeDateX}
+        y1={padding.top}
+        x2={oppositeDateX}
+        y2={padding.top + chartHeight}
+        stroke="rgb(16, 185, 129)"
+        stroke-width="1.5"
+        stroke-opacity="0.7"
+        stroke-dasharray="4 3"
+      />
+    {/if}
 
     <!-- Hovered date vertical line (for cross-component hover sync) -->
     {#if hoveredDateX !== null}

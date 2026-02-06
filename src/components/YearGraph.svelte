@@ -428,7 +428,7 @@
       {#if oppositePosition}
         <g transform="translate({oppositePosition.x}, {oppositePosition.y})">
           <circle r="10" class="fill-white dark:fill-gray-800" />
-          <circle r="8" class="fill-orange-400 dark:fill-orange-500" />
+          <circle r="8" class="fill-emerald-500 dark:fill-emerald-400" />
           <circle r="4" class="fill-white dark:fill-gray-800" />
         </g>
       {/if}
@@ -436,7 +436,7 @@
       <!-- Current date marker -->
       <g transform="translate({currentPosition.x}, {currentPosition.y})">
         <circle r="12" class="fill-white dark:fill-gray-800" />
-        <circle r="10" class="fill-red-500 dark:fill-red-500" />
+        <circle r="10" class="fill-orange-600 dark:fill-orange-500" />
         <circle r="5" class="fill-white dark:fill-gray-800" />
       </g>
       
@@ -479,7 +479,7 @@
             x={center}
             y={center + 24}
             text-anchor="middle"
-            class="fill-orange-500 dark:fill-orange-400"
+            class="fill-emerald-500 dark:fill-emerald-400"
             font-size="12"
           >
             Mirror: {formatDateShort(oppositeDate.date)}
@@ -507,11 +507,11 @@
   <!-- Legend -->
   <div class="mt-4 flex flex-wrap justify-center gap-4 text-xs">
     <div class="flex items-center gap-2">
-      <div class="w-4 h-4 rounded-full bg-red-500 border-2 border-white shadow-sm"></div>
+      <div class="w-4 h-4 rounded-full bg-orange-600 dark:bg-orange-500 border-2 border-white shadow-sm"></div>
       <span class="text-gray-600 dark:text-gray-400">Selected date</span>
     </div>
     <div class="flex items-center gap-2">
-      <div class="w-4 h-4 rounded-full bg-orange-400 border-2 border-white shadow-sm"></div>
+      <div class="w-4 h-4 rounded-full bg-emerald-500 dark:bg-emerald-400 border-2 border-white shadow-sm"></div>
       <span class="text-gray-600 dark:text-gray-400">Mirror date</span>
     </div>
     <div class="flex items-center gap-2">

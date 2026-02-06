@@ -2,7 +2,7 @@
   import { getDayOfYear, getSunPosition, formatDateShort } from '../lib/solar.js';
   import { dateAtLocalInTimezone } from '../lib/utils.js';
 
-  let { yearData, selectedDate, latitude = 0, longitude = 0, timezone = null, hoveredDate = null, onHoverDate = null, onDateSelect = null, hoveredHour = null, onHoverHour = null, selectedHour = $bindable(12) } = $props();
+  let { yearData, selectedDate, oppositeDate = null, latitude = 0, longitude = 0, timezone = null, hoveredDate = null, onHoverDate = null, onDateSelect = null, hoveredHour = null, onHoverHour = null, selectedHour = $bindable(12) } = $props();
 
   let tooltipX = $state(0);
   let tooltipY = $state(0);
@@ -83,6 +83,15 @@
     if (!selectedDate || scatterData.length === 0) return null;
     const doy = getDayOfYear(selectedDate);
     const idx = doy - 1; // getDayOfYear is 1-based
+    if (idx >= 0 && idx < scatterData.length) return scatterData[idx];
+    return null;
+  });
+
+  // Find dot for oppositeDate (mirror date)
+  let oppositeDot = $derived.by(() => {
+    if (!oppositeDate?.date || scatterData.length === 0) return null;
+    const doy = getDayOfYear(oppositeDate.date);
+    const idx = doy - 1;
     if (idx >= 0 && idx < scatterData.length) return scatterData[idx];
     return null;
   });
@@ -285,6 +294,19 @@
         fill-opacity="0.7"
       />
     {/each}
+
+    <!-- Mirror date marker (ring, dashed) -->
+    {#if oppositeDot && (!selectedDot || oppositeDot.dayIndex !== selectedDot.dayIndex)}
+      <circle
+        cx={xScale(oppositeDot.compassAzimuth)}
+        cy={yScale(oppositeDot.altitude)}
+        r="7"
+        fill="none"
+        stroke="rgb(16, 185, 129)"
+        stroke-width="2"
+        stroke-dasharray="3 2"
+      />
+    {/if}
 
     <!-- Hovered date marker (ring) -->
     {#if hoveredDot && (!selectedDot || hoveredDot.dayIndex !== selectedDot.dayIndex)}
