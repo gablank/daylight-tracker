@@ -204,7 +204,7 @@
 
 <div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm flex flex-col">
   <div class="flex items-center justify-between mb-3">
-    <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">Sun Position by Date</h3>
+    <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">Sun position by date</h3>
     <label class="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
       <span>Hour:</span>
       <input

@@ -332,9 +332,8 @@
   });
 </script>
 
-<div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm grid h-full" style="grid-template-rows: auto 1fr auto;">
-  <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Twilight Zones Through the Year</h3>
-  <div class="min-h-0">
+<div class="h-full flex flex-col">
+  <div class="flex-1 min-h-0">
   <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions a11y_no_noninteractive_element_interactions -->
   <svg
     viewBox="0 0 {width} {height}"

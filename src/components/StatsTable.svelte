@@ -102,7 +102,7 @@
 </script>
 
 <div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
-  <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">Daylight Statistics</h3>
+  <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">Daylight statistics</h3>
   
   <!-- Mirror Date section (full width) -->
   {#if mirrorDateInfo}

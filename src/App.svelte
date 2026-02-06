@@ -316,7 +316,7 @@
   </div>
 
   <div class="max-w-7xl mx-auto px-4 py-8">
-    <!-- Row 1: Year overview | Daylight through the year + Twilight zones -->
+    <!-- Row 1: Year overview | Daylight throughout the year (with twilight) -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
       <YearGraph 
         {selectedDate} 
@@ -329,34 +329,53 @@
         onHoverDate={(date) => globalHoveredDate = date}
         onDateSelect={(date) => selectedDate = date}
       />
-      <div class="flex flex-col gap-6 h-full">
-        <div class="flex-1 min-h-0">
-          <DaylightChart 
-            bind:derivativeCount
-            {yearData} 
-            {selectedDate} 
-            {oppositeDate}
-            {latitude}
-            {longitude}
-            {timezone}
-            hoveredDate={globalHoveredDate}
-            onHoverDate={(date) => globalHoveredDate = date}
-            onDateSelect={(date) => selectedDate = date}
-          />
+      <div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm flex flex-col h-full">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">Daylight throughout the year</h3>
+          <label class="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+            <span>Derivatives:</span>
+            <input
+              type="number"
+              min="1"
+              max="5"
+              value={derivativeCount}
+              oninput={(e) => {
+                const v = parseInt(e.currentTarget.value, 10);
+                if (!isNaN(v)) derivativeCount = Math.max(1, Math.min(5, v));
+              }}
+              class="w-14 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 py-1 text-gray-900 dark:text-gray-100 text-center focus:outline-none focus:ring-0"
+            />
+          </label>
         </div>
-        <div class="flex-1 min-h-0">
-          <TwilightChart
-            {yearData}
-            {selectedDate}
-            {oppositeDate}
-            {latitude}
-            {longitude}
-            {timezone}
-            {derivativeCount}
-            hoveredDate={globalHoveredDate}
-            onHoverDate={(date) => globalHoveredDate = date}
-            onDateSelect={(date) => selectedDate = date}
-          />
+        <div class="flex-1 min-h-0 flex flex-col gap-2">
+          <div class="flex-1 min-h-0">
+            <DaylightChart 
+              bind:derivativeCount
+              {yearData} 
+              {selectedDate} 
+              {oppositeDate}
+              {latitude}
+              {longitude}
+              {timezone}
+              hoveredDate={globalHoveredDate}
+              onHoverDate={(date) => globalHoveredDate = date}
+              onDateSelect={(date) => selectedDate = date}
+            />
+          </div>
+          <div class="flex-1 min-h-0">
+            <TwilightChart
+              {yearData}
+              {selectedDate}
+              {oppositeDate}
+              {latitude}
+              {longitude}
+              {timezone}
+              {derivativeCount}
+              hoveredDate={globalHoveredDate}
+              onHoverDate={(date) => globalHoveredDate = date}
+              onDateSelect={(date) => selectedDate = date}
+            />
+          </div>
         </div>
       </div>
     </div>

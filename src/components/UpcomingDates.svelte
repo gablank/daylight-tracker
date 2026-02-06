@@ -219,7 +219,7 @@
 </script>
 
 <div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
-  <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">Noteworthy Upcoming Dates</h3>
+  <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">Noteworthy upcoming dates</h3>
   
   {#if groupedEvents.length > 0}
     <div class="overflow-x-auto">

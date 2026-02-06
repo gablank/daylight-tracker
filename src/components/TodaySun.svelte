@@ -20,7 +20,7 @@
     <div class="flex flex-wrap items-center justify-between gap-4">
       <!-- Title -->
       <div class="flex items-center gap-2">
-        <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">Sun Today</h3>
+        <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">Sun today</h3>
         <span class="text-xs text-gray-500 dark:text-gray-400">
           ({timezone.replace(/_/g, ' ')})
         </span>

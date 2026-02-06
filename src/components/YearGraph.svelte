@@ -269,7 +269,7 @@
 
 <div class="h-full bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm flex flex-col">
   <div class="flex items-center justify-between mb-3">
-    <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">Year Overview</h3>
+    <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">Year overview</h3>
     
     <!-- Direction toggle -->
     <label class="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400 cursor-pointer">
