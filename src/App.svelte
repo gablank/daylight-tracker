@@ -94,6 +94,8 @@
   let oppositeDate = $derived(findOppositeDate(selectedDate));
   
   let isToday = $derived(formatDateISO(selectedDate) === formatDateISO(getToday()));
+  
+
 </script>
 
 <div class="min-h-screen bg-gray-100 dark:bg-gray-900">
@@ -169,6 +171,21 @@
               </span>
             </div>
           {/if}
+        </div>
+        <!-- Latitude slider -->
+        <div class="hidden sm:flex items-center gap-1.5 shrink-0 min-w-0">
+          <label for="lat-slider" class="text-xs text-gray-500 dark:text-gray-400 shrink-0">Lat</label>
+          <input
+            type="range"
+            id="lat-slider"
+            min="-90"
+            max="90"
+            step="0.5"
+            bind:value={latitude}
+            class="w-40 accent-blue-600 cursor-pointer"
+            aria-label="Latitude"
+          />
+          <span class="text-xs font-medium text-gray-700 dark:text-gray-300 w-10 text-right tabular-nums">{latitude.toFixed(1)}°</span>
         </div>
         <button
           type="button"
