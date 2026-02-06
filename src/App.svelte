@@ -9,6 +9,7 @@
   import SunPathChart from './components/SunPathChart.svelte';
   import SunAzimuthChart from './components/SunAzimuthChart.svelte';
   import TwilightChart from './components/TwilightChart.svelte';
+  import WorldMap from './components/WorldMap.svelte';
   import StatsTable from './components/StatsTable.svelte';
   import UpcomingDates from './components/UpcomingDates.svelte';
   
@@ -21,6 +22,7 @@
   let selectedDate = $state(getToday());
   let derivativeCount = $state(1);
   let settingsExpanded = $state(true);
+  let mapExpanded = $state(true);
   let settingsLoaded = $state(false);
   
   // Global hover state - shared across YearGraph, DaylightChart, and other components
@@ -42,6 +44,7 @@
         if (settings.timezone) timezone = settings.timezone;
         if (settings.derivativeCount !== undefined) derivativeCount = Math.max(1, Math.min(5, settings.derivativeCount));
         if (settings.settingsExpanded !== undefined) settingsExpanded = settings.settingsExpanded;
+        if (settings.mapExpanded !== undefined) mapExpanded = settings.mapExpanded;
         // Note: selectedDate is NOT restored - always use current date on page load
         settingsLoaded = true;
       } catch {
@@ -76,7 +79,8 @@
       longitude,
       timezone,
       derivativeCount,
-      settingsExpanded
+      settingsExpanded,
+      mapExpanded
     }));
   });
   
@@ -316,6 +320,29 @@
   </div>
 
   <div class="max-w-7xl mx-auto px-4 py-8">
+    <!-- World map (collapsible) -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden mb-6">
+      <button
+        type="button"
+        class="w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+        onclick={() => mapExpanded = !mapExpanded}
+        aria-expanded={mapExpanded}
+      >
+        <h3 class="text-sm font-medium">World map</h3>
+        <svg
+          class="w-4 h-4 transition-transform {mapExpanded ? 'rotate-180' : ''}"
+          fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"
+        >
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {#if mapExpanded}
+        <div class="px-4 pb-4">
+          <WorldMap bind:latitude bind:longitude selectedDate={globalHoveredDate ?? selectedDate} {timezone} displayHour={globalHoveredHour ?? sunAzimuthSelectedHour} />
+        </div>
+      {/if}
+    </div>
+
     <!-- Row 1: Year overview | Daylight throughout the year (with twilight) -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
       <YearGraph 
