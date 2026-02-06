@@ -43,61 +43,137 @@
   const THRESH_NAUTICAL = -12;
   const THRESH_ASTRONOMICAL = -18;
 
-  // Convert a Date to fractional hour relative to a reference midnight, clamped to [0, 24]
+  // Convert a Date to fractional hour relative to a reference midnight (unclamped)
   function toHourRelative(t, refMidnight) {
     if (!t || isNaN(t.getTime())) return null;
-    const h = (t.getTime() - refMidnight.getTime()) / 3600000;
-    return Math.max(0, Math.min(24, h));
+    return (t.getTime() - refMidnight.getTime()) / 3600000;
   }
 
-  // Resolve a boundary pair: if times are NaN or inverted (midnight crossover), use noonAlt
-  function resolveZone(morningTime, eveningTime, noonAlt, threshold, refMidnight) {
-    const mh = toHourRelative(morningTime, refMidnight);
-    const eh = toHourRelative(eveningTime, refMidnight);
-    if (mh !== null && eh !== null && mh <= eh) {
-      return { morning: mh, evening: eh };
+  /**
+   * Resolve a zone into bands in "natural" (solar) timezone.
+   * Since we compute in the natural tz, events are well-behaved: rise < set, both near [0,24].
+   * Returns { bands: [{morning, evening}, ...] } — empty array if zone isn't visible.
+   */
+  function resolveZone(morningTime, eveningTime, threshold, refMidnight, refNoon, lat, lng) {
+    const mRaw = toHourRelative(morningTime, refMidnight);
+    const eRaw = toHourRelative(eveningTime, refMidnight);
+
+    // Helper: noon altitude for fallback when events are NaN
+    function noonAlt() {
+      return SunCalc.getPosition(refNoon, lat, lng).altitude * 180 / Math.PI;
     }
-    // NaN times or inverted (midnight crossover): determine from noon altitude
-    if (noonAlt > threshold) {
-      // Sun is above threshold at noon → zone exists
-      // If we have valid but inverted times, the evening crossed midnight → extend to edges
-      if (mh !== null && eh !== null) {
-        return { morning: 0, evening: 24 };
+
+    if (mRaw !== null && eRaw !== null) {
+      // Normal: rise then set — clamp to [0, 24]
+      const m = Math.max(0, Math.min(24, mRaw));
+      const e = Math.max(0, Math.min(24, eRaw));
+      if (m < e) return { bands: [{ morning: m, evening: e }] };
+      // Events collapsed after clamping — use noon altitude
+      return noonAlt() > threshold
+        ? { bands: [{ morning: 0, evening: 24 }] }
+        : { bands: [] };
+    }
+
+    // Only rise event (no set — sun rises and stays up)
+    if (mRaw !== null && eRaw === null) {
+      if (noonAlt() > threshold) {
+        const m = Math.max(0, Math.min(24, mRaw));
+        return m < 24 ? { bands: [{ morning: m, evening: 24 }] } : { bands: [] };
       }
-      return { morning: 0, evening: 24 };
-    } else {
-      // Sun never reaches above threshold → zone has zero width
-      return { morning: 12, evening: 12 };
+      return { bands: [] };
     }
+
+    // Only set event (no rise — sun was up, then sets)
+    if (mRaw === null && eRaw !== null) {
+      if (noonAlt() > threshold) {
+        const e = Math.max(0, Math.min(24, eRaw));
+        return e > 0 ? { bands: [{ morning: 0, evening: e }] } : { bands: [] };
+      }
+      return { bands: [] };
+    }
+
+    // Both events NaN: entirely on or entirely off based on noon altitude
+    return noonAlt() > threshold
+      ? { bands: [{ morning: 0, evening: 24 }] }
+      : { bands: [] };
   }
 
-  // Compute twilight boundary hours for every day of the year
+  /**
+   * Rotate bands by `shift` hours, wrapping around [0, 24].
+   * Like a register rotate — what falls off one end appears at the other.
+   */
+  function rotateBands(bands, shift) {
+    if (Math.abs(shift) < 0.001) return bands;
+    const result = [];
+    for (const b of bands) {
+      const m = b.morning + shift;
+      const e = b.evening + shift;
+      if (m >= 0 && e <= 24) {
+        // Entirely within [0, 24]
+        result.push({ morning: m, evening: e });
+      } else if (m < 0 && e <= 24) {
+        // Morning wraps backwards past midnight
+        if (e > 0) result.push({ morning: 0, evening: e });
+        if (m + 24 < 24) result.push({ morning: m + 24, evening: 24 });
+      } else if (m >= 0 && e > 24) {
+        // Evening wraps forward past midnight
+        if (m < 24) result.push({ morning: m, evening: 24 });
+        if (e - 24 > 0) result.push({ morning: 0, evening: e - 24 });
+      } else {
+        // Both wrap — covers entire day
+        result.push({ morning: 0, evening: 24 });
+      }
+    }
+    return result.filter(b => b.evening > b.morning);
+  }
+
+  // Compute twilight boundary bands for every day of the year.
+  // Strategy: compute in the "natural" solar timezone (UTC + longitude/15) where
+  // SunCalc events are well-behaved, then rotate to the selected timezone.
   let twilightData = $derived.by(() => {
     if (!yearData || yearData.length === 0) return [];
+
+    // Natural timezone offset in hours (constant, no DST)
+    const naturalOffsetHours = longitude / 15;
+    const naturalOffsetMs = naturalOffsetHours * 3600000;
+
     const result = [];
     for (let i = 0; i < yearData.length; i++) {
       const d = yearData[i].date;
+      const year = d.getFullYear();
+      const month = d.getMonth() + 1;
+      const day = d.getDate();
 
-      // Compute reference midnight and noon in the configured timezone
-      let refMidnight, refNoon;
+      // Midnight and noon in the natural solar timezone
+      const utcMidnightMs = Date.UTC(year, month - 1, day);
+      const naturalMidnight = new Date(utcMidnightMs - naturalOffsetMs);
+      const naturalNoon = new Date(naturalMidnight.getTime() + 12 * 3600000);
+
+      // SunCalc times computed from natural noon — events are centered and well-behaved
+      const times = cachedSunCalcTimes(naturalNoon, latitude, longitude);
+
+      // Resolve zones in natural solar time
+      const daylight = resolveZone(times.sunrise, times.sunset, THRESH_SUNRISE, naturalMidnight, naturalNoon, latitude, longitude);
+      const civil = resolveZone(times.dawn, times.dusk, THRESH_CIVIL, naturalMidnight, naturalNoon, latitude, longitude);
+      const nautical = resolveZone(times.nauticalDawn, times.nauticalDusk, THRESH_NAUTICAL, naturalMidnight, naturalNoon, latitude, longitude);
+      const astronomical = resolveZone(times.nightEnd, times.night, THRESH_ASTRONOMICAL, naturalMidnight, naturalNoon, latitude, longitude);
+
+      // Compute rotation: shift from natural time to selected timezone
+      let selectedMidnight;
       if (timezone) {
-        refMidnight = dateAtLocalInTimezone(d.getFullYear(), d.getMonth() + 1, d.getDate(), 0, 0, timezone);
-        refNoon = new Date(refMidnight.getTime() + 12 * 3600000);
+        selectedMidnight = dateAtLocalInTimezone(year, month, day, 0, 0, timezone);
       } else {
-        refMidnight = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-        refNoon = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12, 0, 0);
+        selectedMidnight = new Date(year, month - 1, day);
       }
+      const shift = (naturalMidnight.getTime() - selectedMidnight.getTime()) / 3600000;
 
-      const times = cachedSunCalcTimes(refNoon, latitude, longitude);
-      const noonPosition = SunCalc.getPosition(times.solarNoon, latitude, longitude);
-      const noonAlt = noonPosition.altitude * 180 / Math.PI;
-
-      const daylight = resolveZone(times.sunrise, times.sunset, noonAlt, THRESH_SUNRISE, refMidnight);
-      const civil = resolveZone(times.dawn, times.dusk, noonAlt, THRESH_CIVIL, refMidnight);
-      const nautical = resolveZone(times.nauticalDawn, times.nauticalDusk, noonAlt, THRESH_NAUTICAL, refMidnight);
-      const astronomical = resolveZone(times.nightEnd, times.night, noonAlt, THRESH_ASTRONOMICAL, refMidnight);
-
-      result.push({ daylight, civil, nautical, astronomical });
+      // Rotate all zone bands from natural solar time → selected timezone
+      result.push({
+        daylight:      { bands: rotateBands(daylight.bands, shift) },
+        civil:         { bands: rotateBands(civil.bands, shift) },
+        nautical:      { bands: rotateBands(nautical.bands, shift) },
+        astronomical:  { bands: rotateBands(astronomical.bands, shift) },
+      });
     }
     return result;
   });
@@ -112,27 +188,28 @@
     return padding.top + (hour / 24) * chartHeight;
   }
 
-  // Build area path between morning and evening boundary lines
-  function buildAreaPath(data, zone) {
-    if (data.length === 0) return '';
+  // Build rects for a zone: one rect per band per day
+  function buildZoneRects(data, zone) {
+    if (data.length === 0) return [];
     const n = data.length;
-    // Forward: morning boundary (top of zone)
-    let path = `M ${xScale(0)} ${yScale(data[0][zone].morning)}`;
-    for (let i = 1; i < n; i++) {
-      path += ` L ${xScale(i)} ${yScale(data[i][zone].morning)}`;
+    const colW = chartWidth / n;
+    const rects = [];
+    for (let i = 0; i < n; i++) {
+      const bands = data[i][zone].bands;
+      const x = padding.left + (i / n) * chartWidth;
+      for (const b of bands) {
+        const y = yScale(b.morning);
+        const h = yScale(b.evening) - y;
+        if (h > 0) rects.push({ x, y, w: Math.ceil(colW + 0.5), h });
+      }
     }
-    // Backward: evening boundary (bottom of zone)
-    for (let i = n - 1; i >= 0; i--) {
-      path += ` L ${xScale(i)} ${yScale(data[i][zone].evening)}`;
-    }
-    path += ' Z';
-    return path;
+    return rects;
   }
 
-  let astronomicalPath = $derived(buildAreaPath(twilightData, 'astronomical'));
-  let nauticalPath = $derived(buildAreaPath(twilightData, 'nautical'));
-  let civilPath = $derived(buildAreaPath(twilightData, 'civil'));
-  let daylightPath = $derived(buildAreaPath(twilightData, 'daylight'));
+  let astronomicalRects = $derived(buildZoneRects(twilightData, 'astronomical'));
+  let nauticalRects = $derived(buildZoneRects(twilightData, 'nautical'));
+  let civilRects = $derived(buildZoneRects(twilightData, 'civil'));
+  let daylightRects = $derived(buildZoneRects(twilightData, 'daylight'));
 
   // Month tick positions
   let monthTicks = $derived.by(() => {
@@ -225,11 +302,15 @@
     const idx = Math.max(0, Math.min(twilightData.length - 1, doy - 1));
     const t = twilightData[idx];
 
-    const daylightH = t.daylight.evening - t.daylight.morning;
-    const civilH = (t.civil.evening - t.civil.morning) - daylightH;
-    const nauticalH = (t.nautical.evening - t.nautical.morning) - (t.civil.evening - t.civil.morning);
-    const astronomicalH = (t.astronomical.evening - t.astronomical.morning) - (t.nautical.evening - t.nautical.morning);
-    const nightH = 24 - (t.astronomical.evening - t.astronomical.morning);
+    const sumBands = (zone) => zone.bands.reduce((s, b) => s + (b.evening - b.morning), 0);
+    const daylightH = sumBands(t.daylight);
+    const civilTotal = sumBands(t.civil);
+    const nauticalTotal = sumBands(t.nautical);
+    const astronomicalTotal = sumBands(t.astronomical);
+    const civilH = civilTotal - daylightH;
+    const nauticalH = nauticalTotal - civilTotal;
+    const astronomicalH = astronomicalTotal - nauticalTotal;
+    const nightH = 24 - astronomicalTotal;
 
     return {
       daylight: formatHours(daylightH),
@@ -274,24 +355,24 @@
     />
 
     <!-- Astronomical twilight band -->
-    {#if astronomicalPath}
-      <path d={astronomicalPath} fill={colors.astronomical} />
-    {/if}
+    {#each astronomicalRects as r}
+      <rect x={r.x} y={r.y} width={r.w} height={r.h} fill={colors.astronomical} />
+    {/each}
 
     <!-- Nautical twilight band -->
-    {#if nauticalPath}
-      <path d={nauticalPath} fill={colors.nautical} />
-    {/if}
+    {#each nauticalRects as r}
+      <rect x={r.x} y={r.y} width={r.w} height={r.h} fill={colors.nautical} />
+    {/each}
 
     <!-- Civil twilight band -->
-    {#if civilPath}
-      <path d={civilPath} fill={colors.civil} />
-    {/if}
+    {#each civilRects as r}
+      <rect x={r.x} y={r.y} width={r.w} height={r.h} fill={colors.civil} />
+    {/each}
 
     <!-- Daylight band -->
-    {#if daylightPath}
-      <path d={daylightPath} fill={colors.daylight} />
-    {/if}
+    {#each daylightRects as r}
+      <rect x={r.x} y={r.y} width={r.w} height={r.h} fill={colors.daylight} />
+    {/each}
 
     <!-- Y-axis: hour grid lines and labels -->
     {#each hourTicks as hour}
