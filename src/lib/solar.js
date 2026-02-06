@@ -231,23 +231,47 @@ export function findOppositeDate(currentDate) {
   if (!yearData || yearData.length === 0) return null;
 
   const daysInYear = yearData.length;
+  // getDayOfYear is 1-based: Jan 1 = 1, Dec 31 = 365 (or 366)
   const currentDOY = getDayOfYear(currentDate);
   const currentData = yearData[currentDOY - 1];
   if (!currentData) return null;
 
   const summerSolsticeDOY = getDayOfYear(getSummerSolstice(year));
+  const winterSolsticeDOY = getDayOfYear(getWinterSolstice(year));
 
-  // Other half = opposite side of summer solstice (same-daylight pairs are symmetric around it).
-  // Before solstice (Jan–June 20): search after solstice (June 22–Dec 31).
-  // After solstice (June 22–Dec 31): search before solstice (Jan 1–June 21).
-  const isBeforeOrOnSolstice = currentDOY <= summerSolsticeDOY;
-  const otherHalfStart = isBeforeOrOnSolstice ? summerSolsticeDOY + 1 : 1;
-  const otherHalfEnd = isBeforeOrOnSolstice ? daysInYear : summerSolsticeDOY - 1;
-
+  // Mirror across the NEAREST solstice. Daylight is symmetric around each solstice,
+  // so Dec 25 mirrors to ~Dec 17 (both near winter solstice), and
+  // Mar 1 mirrors to ~Oct 12 (both equidistant from summer solstice).
+  
+  // Calculate distance to each solstice (handling year wrap for winter solstice)
+  const distToSummer = Math.min(
+    Math.abs(currentDOY - summerSolsticeDOY),
+    daysInYear - Math.abs(currentDOY - summerSolsticeDOY)
+  );
+  const distToWinter = Math.min(
+    Math.abs(currentDOY - winterSolsticeDOY),
+    daysInYear - Math.abs(currentDOY - winterSolsticeDOY)
+  );
+  
+  // Reflect across the nearest solstice
+  const nearestSolsticeDOY = distToWinter <= distToSummer ? winterSolsticeDOY : summerSolsticeDOY;
+  
+  // Calculate the reflected DOY
+  let mirrorDOY = 2 * nearestSolsticeDOY - currentDOY;
+  // Wrap around the year
+  if (mirrorDOY < 1) mirrorDOY += daysInYear;
+  if (mirrorDOY > daysInYear) mirrorDOY -= daysInYear;
+  
+  // Search a window around the reflected DOY for the best daylight match
+  // (the reflection is approximate because the daylight curve isn't perfectly symmetric)
+  const SEARCH_WINDOW = 15;
   let bestDOY = null;
   let bestDiff = Infinity;
-
-  for (let doy = otherHalfStart; doy <= otherHalfEnd; doy++) {
+  
+  for (let offset = -SEARCH_WINDOW; offset <= SEARCH_WINDOW; offset++) {
+    let doy = mirrorDOY + offset;
+    if (doy < 1) doy += daysInYear;
+    if (doy > daysInYear) doy -= daysInYear;
     if (doy === currentDOY) continue; // never pick the same day as its own mirror
     const data = yearData[doy - 1];
     if (!data) continue;
