@@ -156,6 +156,22 @@ export function getSunData(date, latitude, longitude = 0) {
 }
 
 /**
+ * Get all twilight boundary times for a given date.
+ * Returns the raw SunCalc times object plus maxAltitude for polar handling.
+ * @param {Date} date - The date
+ * @param {number} latitude - Latitude
+ * @param {number} longitude - Longitude
+ * @returns {Object} SunCalc times object with all twilight boundaries + maxAltitude in degrees
+ */
+export function getTwilightTimes(date, latitude, longitude = 0) {
+  const noon = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0);
+  const times = SunCalc.getTimes(noon, latitude, longitude);
+  const noonPosition = SunCalc.getPosition(times.solarNoon, latitude, longitude);
+  times.maxAltitude = noonPosition.altitude * 180 / Math.PI;
+  return times;
+}
+
+/**
  * Get sun position (altitude and azimuth) at a specific time
  * @param {Date} date - The date/time
  * @param {number} latitude - Latitude

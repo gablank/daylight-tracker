@@ -8,6 +8,7 @@
   import DaylightChart from './components/DaylightChart.svelte';
   import SunPathChart from './components/SunPathChart.svelte';
   import SunAzimuthChart from './components/SunAzimuthChart.svelte';
+  import TwilightChart from './components/TwilightChart.svelte';
   import StatsTable from './components/StatsTable.svelte';
   import UpcomingDates from './components/UpcomingDates.svelte';
   
@@ -206,7 +207,7 @@
   </div>
 
   <div class="max-w-7xl mx-auto px-4 py-8">
-    <!-- Row 1: Year overview | Daylight through the year -->
+    <!-- Row 1: Year overview | Daylight through the year + Twilight zones -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
       <YearGraph 
         {selectedDate} 
@@ -219,17 +220,34 @@
         onHoverDate={(date) => globalHoveredDate = date}
         onDateSelect={(date) => selectedDate = date}
       />
-      <DaylightChart 
-        bind:derivativeCount
-        {yearData} 
-        {selectedDate} 
-        {latitude}
-        {longitude}
-        {timezone}
-        hoveredDate={globalHoveredDate}
-        onHoverDate={(date) => globalHoveredDate = date}
-        onDateSelect={(date) => selectedDate = date}
-      />
+      <div class="flex flex-col gap-6 h-full">
+        <div class="flex-1 min-h-0">
+          <DaylightChart 
+            bind:derivativeCount
+            {yearData} 
+            {selectedDate} 
+            {latitude}
+            {longitude}
+            {timezone}
+            hoveredDate={globalHoveredDate}
+            onHoverDate={(date) => globalHoveredDate = date}
+            onDateSelect={(date) => selectedDate = date}
+          />
+        </div>
+        <div class="flex-1 min-h-0">
+          <TwilightChart
+            {yearData}
+            {selectedDate}
+            {latitude}
+            {longitude}
+            {timezone}
+            {derivativeCount}
+            hoveredDate={globalHoveredDate}
+            onHoverDate={(date) => globalHoveredDate = date}
+            onDateSelect={(date) => selectedDate = date}
+          />
+        </div>
+      </div>
     </div>
     
     <!-- Row 2: Sun position by date | Sun path -->

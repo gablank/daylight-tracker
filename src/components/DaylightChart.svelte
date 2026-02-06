@@ -214,12 +214,11 @@
       />
     </label>
   </div>
-  <div class="min-h-0 relative">
+  <div class="min-h-0">
   <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions a11y_no_noninteractive_element_interactions -->
   <svg
     viewBox="0 0 {width} {height}"
-    class="absolute inset-0 w-full h-full cursor-pointer outline-none"
-    preserveAspectRatio="xMidYMid meet"
+    class="w-full cursor-pointer outline-none"
     onclick={handleChartClick}
     onmousemove={handleChartMouseMove}
     onmouseleave={handleChartMouseLeave}
