@@ -292,11 +292,32 @@ export function getLocalTimezone() {
  * @param {string} timezone - IANA timezone name
  * @returns {{ year: number, month: number, day: number }} month 1-12, day 1-31
  */
+// Formatter cache: Intl.DateTimeFormat construction is expensive
+const _formatterCache = new Map();
+function _getFormatter(timezone, options) {
+  const key = timezone + JSON.stringify(options);
+  let fmt = _formatterCache.get(key);
+  if (!fmt) {
+    fmt = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, ...options });
+    _formatterCache.set(key, fmt);
+  }
+  return fmt;
+}
+
+const _calDayCache = new Map();
 export function getCalendarDayInTimezone(date, timezone) {
-  const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' });
+  const ts = date.getTime();
+  const key = `${ts}:${timezone}`;
+  let result = _calDayCache.get(key);
+  if (result) return result;
+
+  const formatter = _getFormatter(timezone, { year: 'numeric', month: '2-digit', day: '2-digit' });
   const parts = formatter.formatToParts(date);
   const get = (type) => parseInt(parts.find((p) => p.type === type).value, 10);
-  return { year: get('year'), month: get('month'), day: get('day') };
+  result = { year: get('year'), month: get('month'), day: get('day') };
+  if (_calDayCache.size > 5000) _calDayCache.clear();
+  _calDayCache.set(key, result);
+  return result;
 }
 
 /**
@@ -306,10 +327,19 @@ export function getCalendarDayInTimezone(date, timezone) {
  * @param {string} timezone - IANA timezone name
  * @returns {number}
  */
+const _hourInTzCache = new Map();
 export function getHourInTimezone(date, timezone) {
+  const ts = date.getTime();
+  const key = `${ts}:${timezone}`;
+  let result = _hourInTzCache.get(key);
+  if (result !== undefined) return result;
+
   const { year, month, day } = getCalendarDayInTimezone(date, timezone);
   const midnight = dateAtLocalInTimezone(year, month, day, 0, 0, timezone);
-  return (date.getTime() - midnight.getTime()) / 3600000;
+  result = (ts - midnight.getTime()) / 3600000;
+  if (_hourInTzCache.size > 5000) _hourInTzCache.clear();
+  _hourInTzCache.set(key, result);
+  return result;
 }
 
 /**
@@ -322,8 +352,13 @@ export function getHourInTimezone(date, timezone) {
  * @param {string} timezone - IANA timezone name
  * @returns {Date}
  */
+const _dateAtLocalCache = new Map();
 export function dateAtLocalInTimezone(year, month, day, hour, min, timezone) {
-  const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+  const key = `${year}:${month}:${day}:${hour}:${min}:${timezone}`;
+  let cached = _dateAtLocalCache.get(key);
+  if (cached) return cached;
+
+  const formatter = _getFormatter(timezone, { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
   // Find midnight on (year, month, day) in timezone first; start from noon UTC that day
   let M = Date.UTC(year, month - 1, day, 12, 0, 0);
   for (let i = 0; i < 15; i++) {
@@ -331,7 +366,10 @@ export function dateAtLocalInTimezone(year, month, day, hour, min, timezone) {
     const get = (type) => parseInt(parts.find((p) => p.type === type)?.value ?? '0', 10);
     const y0 = get('year'), m0 = get('month'), d0 = get('day'), h0 = get('hour'), min0 = get('minute');
     if (y0 === year && m0 === month && d0 === day && h0 === 0 && min0 === 0) {
-      return new Date(M + hour * 3600000 + min * 60000);
+      const result = new Date(M + hour * 3600000 + min * 60000);
+      if (_dateAtLocalCache.size > 5000) _dateAtLocalCache.clear();
+      _dateAtLocalCache.set(key, result);
+      return result;
     }
     if (y0 === year && m0 === month && d0 === day) {
       M -= h0 * 3600000 + min0 * 60000;
@@ -341,5 +379,8 @@ export function dateAtLocalInTimezone(year, month, day, hour, min, timezone) {
       M -= 24 * 3600000;
     }
   }
-  return new Date(M + hour * 3600000 + min * 60000);
+  const result = new Date(M + hour * 3600000 + min * 60000);
+  if (_dateAtLocalCache.size > 5000) _dateAtLocalCache.clear();
+  _dateAtLocalCache.set(key, result);
+  return result;
 }

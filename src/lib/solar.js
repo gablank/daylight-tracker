@@ -107,7 +107,11 @@ export function getSeptemberEquinox(year) {
  * @param {number} longitude - The longitude (-180 to 180), defaults to 0
  * @returns {Object} Sun data including sunrise, sunset, daylight duration, etc.
  */
+const _sunDataCache = new Map();
 export function getSunData(date, latitude, longitude = 0) {
+  const cacheKey = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}:${latitude}:${longitude}`;
+  if (_sunDataCache.has(cacheKey)) return _sunDataCache.get(cacheKey);
+
   // Use noon local for the calendar day so SunCalc (UTC-based) gets the correct day;
   // midnight local can be the previous UTC day in positive-offset timezones.
   const noon = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0);
@@ -142,7 +146,7 @@ export function getSunData(date, latitude, longitude = 0) {
   const noonPosition = SunCalc.getPosition(solarNoon, latitude, longitude);
   const maxAltitude = noonPosition.altitude * 180 / Math.PI; // Convert radians to degrees
   
-  return {
+  const result = {
     date,
     sunrise: isPolarNight ? null : (isPolarDay ? null : sunrise),
     sunset: isPolarNight ? null : (isPolarDay ? null : sunset),
@@ -153,6 +157,9 @@ export function getSunData(date, latitude, longitude = 0) {
     isPolarDay,
     isPolarNight
   };
+  if (_sunDataCache.size > 200000) _sunDataCache.clear();
+  _sunDataCache.set(cacheKey, result);
+  return result;
 }
 
 /**
@@ -163,11 +170,31 @@ export function getSunData(date, latitude, longitude = 0) {
  * @param {number} longitude - Longitude
  * @returns {Object} SunCalc times object with all twilight boundaries + maxAltitude in degrees
  */
+const _twilightCache = new Map();
 export function getTwilightTimes(date, latitude, longitude = 0) {
+  const cacheKey = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}:${latitude}:${longitude}`;
+  if (_twilightCache.has(cacheKey)) return _twilightCache.get(cacheKey);
+
   const noon = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0);
   const times = SunCalc.getTimes(noon, latitude, longitude);
   const noonPosition = SunCalc.getPosition(times.solarNoon, latitude, longitude);
   times.maxAltitude = noonPosition.altitude * 180 / Math.PI;
+  if (_twilightCache.size > 200000) _twilightCache.clear();
+  _twilightCache.set(cacheKey, times);
+  return times;
+}
+
+/**
+ * Cached wrapper around SunCalc.getTimes for arbitrary reference timestamps.
+ * Unlike getTwilightTimes, this takes the exact timestamp to pass to SunCalc.
+ */
+const _sunCalcTimesCache = new Map();
+export function cachedSunCalcTimes(refDate, latitude, longitude) {
+  const key = `${refDate.getTime()}:${latitude}:${longitude}`;
+  if (_sunCalcTimesCache.has(key)) return _sunCalcTimesCache.get(key);
+  const times = SunCalc.getTimes(refDate, latitude, longitude);
+  if (_sunCalcTimesCache.size > 200000) _sunCalcTimesCache.clear();
+  _sunCalcTimesCache.set(key, times);
   return times;
 }
 
@@ -178,14 +205,21 @@ export function getTwilightTimes(date, latitude, longitude = 0) {
  * @param {number} longitude - Longitude
  * @returns {{altitude: number, azimuth: number}} altitude and azimuth in degrees
  */
+const _sunPosCache = new Map();
 export function getSunPosition(date, latitude, longitude = 0) {
+  const cacheKey = `${date.getTime()}:${latitude}:${longitude}`;
+  if (_sunPosCache.has(cacheKey)) return _sunPosCache.get(cacheKey);
+
   const pos = SunCalc.getPosition(date, latitude, longitude);
   let azimuth = pos.azimuth * 180 / Math.PI;
   if (azimuth < 0) azimuth += 360;
-  return {
+  const result = {
     altitude: pos.altitude * 180 / Math.PI,
     azimuth
   };
+  if (_sunPosCache.size > 200000) _sunPosCache.clear();
+  _sunPosCache.set(cacheKey, result);
+  return result;
 }
 
 /**
@@ -219,7 +253,13 @@ export function getSunPathForDay(date, latitude, longitude = 0, timezone = null)
  * @param {number} year - The year to compute
  * @returns {Array} Array of sun data for each day
  */
+const _yearDataCache = new Map();
+const _YEAR_DATA_CACHE_MAX = 1000;
+
 export function computeYearData(latitude, year) {
+  const key = `${latitude}:${year}`;
+  if (_yearDataCache.has(key)) return _yearDataCache.get(key);
+
   const daysInYear = getDaysInYear(year);
   const data = [];
   for (let dayOfYear = 1; dayOfYear <= daysInYear; dayOfYear++) {
@@ -227,6 +267,13 @@ export function computeYearData(latitude, year) {
     const sunData = getSunData(date, latitude);
     data.push(sunData);
   }
+
+  // Evict oldest entries if cache is full
+  if (_yearDataCache.size >= _YEAR_DATA_CACHE_MAX) {
+    const firstKey = _yearDataCache.keys().next().value;
+    _yearDataCache.delete(firstKey);
+  }
+  _yearDataCache.set(key, data);
   return data;
 }
 
@@ -808,23 +855,34 @@ export function findUpcomingDaylightMilestones(currentDate, yearData, latitude, 
   return milestones;
 }
 
+// Cached formatters for decimal hour extraction (avoids recreating Intl objects per call)
+const _hourFormatters = new Map();
+const _minFormatters = new Map();
+function _getHourFormatter(timezone) {
+  let fmt = _hourFormatters.get(timezone);
+  if (!fmt) {
+    fmt = new Intl.DateTimeFormat('en-GB', { timeZone: timezone, hour: 'numeric', hour12: false });
+    _hourFormatters.set(timezone, fmt);
+  }
+  return fmt;
+}
+function _getMinFormatter(timezone) {
+  let fmt = _minFormatters.get(timezone);
+  if (!fmt) {
+    fmt = new Intl.DateTimeFormat('en-GB', { timeZone: timezone, minute: 'numeric' });
+    _minFormatters.set(timezone, fmt);
+  }
+  return fmt;
+}
+
 /**
  * Helper to get sunrise time in decimal hours for a given timezone
  */
 function getSunriseDecimalHours(sunData, timezone) {
   if (!sunData.sunrise) return null;
   try {
-    const hourFormatter = new Intl.DateTimeFormat('en-GB', {
-      timeZone: timezone,
-      hour: 'numeric',
-      hour12: false
-    });
-    const minFormatter = new Intl.DateTimeFormat('en-GB', {
-      timeZone: timezone,
-      minute: 'numeric'
-    });
-    const hour = parseInt(hourFormatter.format(sunData.sunrise));
-    const min = parseInt(minFormatter.format(sunData.sunrise));
+    const hour = parseInt(_getHourFormatter(timezone).format(sunData.sunrise));
+    const min = parseInt(_getMinFormatter(timezone).format(sunData.sunrise));
     return hour + min / 60;
   } catch {
     return sunData.sunrise.getUTCHours() + sunData.sunrise.getUTCMinutes() / 60;
@@ -841,7 +899,11 @@ function getSunriseDecimalHours(sunData, timezone) {
  * @param {number} count - Number of milestones to find
  * @returns {Array} Array of milestones with date and crossing description
  */
+const _sunriseMilestonesCache = new Map();
 export function findUpcomingSunriseMilestones(currentDate, latitude, longitude, timezone, count = 8) {
+  const key = `${currentDate.getFullYear()}-${currentDate.getMonth()}-${currentDate.getDate()}:${latitude}:${longitude}:${timezone}:${count}`;
+  if (_sunriseMilestonesCache.has(key)) return _sunriseMilestonesCache.get(key);
+
   const milestones = [];
   const isExtremeLatitude = Math.abs(latitude) > 66.5;
   
@@ -895,6 +957,8 @@ export function findUpcomingSunriseMilestones(currentDate, latitude, longitude, 
     prevHours = currHours;
   }
   
+  if (_sunriseMilestonesCache.size > 200) _sunriseMilestonesCache.clear();
+  _sunriseMilestonesCache.set(key, milestones);
   return milestones;
 }
 
@@ -904,17 +968,8 @@ export function findUpcomingSunriseMilestones(currentDate, latitude, longitude, 
 function getSunsetDecimalHours(sunData, timezone) {
   if (!sunData.sunset) return null;
   try {
-    const hourFormatter = new Intl.DateTimeFormat('en-GB', {
-      timeZone: timezone,
-      hour: 'numeric',
-      hour12: false
-    });
-    const minFormatter = new Intl.DateTimeFormat('en-GB', {
-      timeZone: timezone,
-      minute: 'numeric'
-    });
-    const hour = parseInt(hourFormatter.format(sunData.sunset));
-    const min = parseInt(minFormatter.format(sunData.sunset));
+    const hour = parseInt(_getHourFormatter(timezone).format(sunData.sunset));
+    const min = parseInt(_getMinFormatter(timezone).format(sunData.sunset));
     return hour + min / 60;
   } catch {
     return sunData.sunset.getUTCHours() + sunData.sunset.getUTCMinutes() / 60;
@@ -931,7 +986,11 @@ function getSunsetDecimalHours(sunData, timezone) {
  * @param {number} count - Number of milestones to find
  * @returns {Array} Array of milestones with date and crossing description
  */
+const _sunsetMilestonesCache = new Map();
 export function findUpcomingSunsetMilestones(currentDate, latitude, longitude, timezone, count = 8) {
+  const key = `${currentDate.getFullYear()}-${currentDate.getMonth()}-${currentDate.getDate()}:${latitude}:${longitude}:${timezone}:${count}`;
+  if (_sunsetMilestonesCache.has(key)) return _sunsetMilestonesCache.get(key);
+
   const milestones = [];
   const isExtremeLatitude = Math.abs(latitude) > 66.5;
   
@@ -985,6 +1044,8 @@ export function findUpcomingSunsetMilestones(currentDate, latitude, longitude, t
     prevHours = currHours;
   }
   
+  if (_sunsetMilestonesCache.size > 200) _sunsetMilestonesCache.clear();
+  _sunsetMilestonesCache.set(key, milestones);
   return milestones;
 }
 
@@ -1042,7 +1103,11 @@ function formatTimeInTz(date, timezone) {
  * @param {number} count - Number of transitions to find
  * @returns {Array} Array of DST transitions with date, description, and sun times
  */
+const _dstCache = new Map();
 export function findUpcomingDSTChanges(currentDate, timezone, latitude, longitude, count = 2) {
+  const key = `${currentDate.getFullYear()}-${currentDate.getMonth()}-${currentDate.getDate()}:${timezone}:${latitude}:${longitude}:${count}`;
+  if (_dstCache.has(key)) return _dstCache.get(key);
+
   const transitions = [];
   
   // Get noon offset for the day before we start searching
@@ -1090,5 +1155,7 @@ export function findUpcomingDSTChanges(currentDate, timezone, latitude, longitud
     prevNoonOffset = noonOffset;
   }
   
+  if (_dstCache.size > 200) _dstCache.clear();
+  _dstCache.set(key, transitions);
   return transitions;
 }

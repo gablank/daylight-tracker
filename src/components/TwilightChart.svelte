@@ -1,6 +1,6 @@
 <script>
   import SunCalc from 'suncalc';
-  import { getDayOfYear, getDaysInYear, getDayStatsForTooltip } from '../lib/solar.js';
+  import { getDayOfYear, getDaysInYear, getDayStatsForTooltip, cachedSunCalcTimes } from '../lib/solar.js';
   import { dateAtLocalInTimezone } from '../lib/utils.js';
 
   let { yearData, selectedDate, oppositeDate = null, latitude = 0, longitude = 0, timezone = null, hoveredDate = null, onHoverDate = null, onDateSelect = null, derivativeCount = 1 } = $props();
@@ -88,7 +88,7 @@
         refNoon = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12, 0, 0);
       }
 
-      const times = SunCalc.getTimes(refNoon, latitude, longitude);
+      const times = cachedSunCalcTimes(refNoon, latitude, longitude);
       const noonPosition = SunCalc.getPosition(times.solarNoon, latitude, longitude);
       const noonAlt = noonPosition.altitude * 180 / Math.PI;
 

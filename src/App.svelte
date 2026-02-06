@@ -1,5 +1,5 @@
 <script>
-  import { computeYearData, getSunData, findOppositeDate, formatDateShort, formatDuration } from './lib/solar.js';
+  import { computeYearData, getSunData, findOppositeDate, formatDateShort, formatDuration, findUpcomingSunriseMilestones, findUpcomingSunsetMilestones, findUpcomingDSTChanges, findUpcomingDaylightMilestones } from './lib/solar.js';
   import { getToday, getLocalTimezone, formatTimeInTimezone, formatDateISO } from './lib/utils.js';
   
   import LatitudeSelector from './components/LatitudeSelector.svelte';
@@ -95,8 +95,80 @@
   
   let isToday = $derived(formatDateISO(selectedDate) === formatDateISO(getToday()));
   
-
+  // Precompute state
+  let precomputeProgress = $state(null); // null = idle, 0-1 = in progress
+  let precomputeDone = $state(false);
+  
+  async function precomputeAllLatitudes() {
+    const year = selectedDate.getFullYear();
+    const date = selectedDate;
+    const lng = longitude;
+    const tz = timezone;
+    const t0 = performance.now();
+    
+    // All multiples of 0.5 from -90 to 90 = 361 latitudes
+    const latitudes = [];
+    for (let i = -180; i <= 180; i++) {
+      latitudes.push(i / 2);
+    }
+    const total = latitudes.length;
+    precomputeProgress = 0;
+    precomputeDone = false;
+    
+    for (let i = 0; i < total; i++) {
+      const lat = latitudes[i];
+      // Warm yearData cache (365 getSunData calls at lng=0)
+      const yd = computeYearData(lat, year);
+      // Warm getSunData cache for actual longitude (used by milestone functions)
+      for (let doy = 1; doy <= yd.length; doy++) {
+        getSunData(new Date(year, 0, doy), lat, lng);
+      }
+      // Warm milestone function caches
+      findUpcomingSunriseMilestones(date, lat, lng, tz);
+      findUpcomingSunsetMilestones(date, lat, lng, tz);
+      findUpcomingDaylightMilestones(date, yd, lat);
+      findUpcomingDSTChanges(date, tz, lat, lng);
+      
+      precomputeProgress = (i + 1) / total;
+      // Yield to UI every few items
+      if (i % 2 === 0) await new Promise((r) => setTimeout(r, 0));
+    }
+    const elapsed = ((performance.now() - t0) / 1000).toFixed(1);
+    precomputeProgress = null;
+    precomputeDone = true;
+    console.log(`Precomputed ${total} latitudes (-90° to 90°, step 0.5°) for year ${year} in ${elapsed}s`);
+  }
+  
+  // Global arrow key handler for latitude slider
+  // Snaps to the 0.5° grid so all values are precomputable
+  function handleGlobalKeydown(e) {
+    // Skip if user is typing in an input, textarea, select, or contenteditable
+    const tag = document.activeElement?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || document.activeElement?.isContentEditable) return;
+    
+    if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      if (e.shiftKey) {
+        // Jump to next 5° boundary
+        latitude = Math.min(90, Math.ceil((latitude + 0.01) / 5) * 5);
+      } else {
+        // Snap to next 0.5° boundary above
+        latitude = Math.min(90, Math.ceil((latitude + 0.01) * 2) / 2);
+      }
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      if (e.shiftKey) {
+        // Jump to previous 5° boundary
+        latitude = Math.max(-90, Math.floor((latitude - 0.01) / 5) * 5);
+      } else {
+        // Snap to next 0.5° boundary below
+        latitude = Math.max(-90, Math.floor((latitude - 0.01) * 2) / 2);
+      }
+    }
+  }
 </script>
+
+<svelte:window onkeydown={handleGlobalKeydown} />
 
 <div class="min-h-screen bg-gray-100 dark:bg-gray-900">
   <!-- Sticky bar: selected day summary + settings toggle -->
@@ -186,6 +258,23 @@
             aria-label="Latitude"
           />
           <span class="text-xs font-medium text-gray-700 dark:text-gray-300 w-10 text-right tabular-nums">{latitude.toFixed(1)}°</span>
+          {#if precomputeProgress !== null}
+            <div class="w-16 h-1.5 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden" title="Precomputing... {Math.round(precomputeProgress * 100)}%">
+              <div class="h-full bg-blue-500 transition-all duration-75 rounded-full" style="width: {precomputeProgress * 100}%"></div>
+            </div>
+          {:else}
+            <button
+              type="button"
+              class="text-[10px] px-1.5 py-0.5 rounded border transition-colors shrink-0
+                     {precomputeDone
+                       ? 'border-emerald-400 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30'
+                       : 'border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'}"
+              onclick={precomputeAllLatitudes}
+              title="Precompute year data for all latitudes so the slider is instant"
+            >
+              {precomputeDone ? 'Cached' : 'Precompute'}
+            </button>
+          {/if}
         </div>
         <button
           type="button"
