@@ -97,7 +97,11 @@
   
   // Precompute state
   let precomputeProgress = $state(null); // null = idle, 0-1 = in progress
-  let precomputeDone = $state(false);
+  let precomputedKey = $state(null); // tracks what was precomputed: "date:lng:tz"
+  let precomputeDone = $derived(
+    precomputedKey !== null &&
+    precomputedKey === `${formatDateISO(selectedDate)}:${longitude}:${timezone}`
+  );
   
   async function precomputeAllLatitudes() {
     const year = selectedDate.getFullYear();
@@ -113,7 +117,6 @@
     }
     const total = latitudes.length;
     precomputeProgress = 0;
-    precomputeDone = false;
     
     for (let i = 0; i < total; i++) {
       const lat = latitudes[i];
@@ -135,7 +138,7 @@
     }
     const elapsed = ((performance.now() - t0) / 1000).toFixed(1);
     precomputeProgress = null;
-    precomputeDone = true;
+    precomputedKey = `${formatDateISO(date)}:${lng}:${tz}`;
     console.log(`Precomputed ${total} latitudes (-90° to 90°, step 0.5°) for year ${year} in ${elapsed}s`);
   }
   
