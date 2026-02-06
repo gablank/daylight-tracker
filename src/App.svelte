@@ -7,6 +7,7 @@
   import YearGraph from './components/YearGraph.svelte';
   import DaylightChart from './components/DaylightChart.svelte';
   import SunPathChart from './components/SunPathChart.svelte';
+  import SunAzimuthChart from './components/SunAzimuthChart.svelte';
   import StatsTable from './components/StatsTable.svelte';
   import UpcomingDates from './components/UpcomingDates.svelte';
   
@@ -23,6 +24,9 @@
   
   // Global hover state - shared across YearGraph, DaylightChart, and other components
   let globalHoveredDate = $state(null);
+  // Shared hour state between SunAzimuthChart and SunPathChart
+  let globalHoveredHour = $state(null);
+  let sunAzimuthSelectedHour = $state(12);
   
   // Load settings from localStorage on mount (selectedDate always defaults to today)
   $effect(() => {
@@ -202,8 +206,8 @@
   </div>
 
   <div class="max-w-7xl mx-auto px-4 py-8">
-    <!-- Year overview (left, full height) | Daylight chart + Sun path (right, stacked 50/50) -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6 min-h-[520px]">
+    <!-- Row 1: Year overview | Daylight through the year -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
       <YearGraph 
         {selectedDate} 
         {yearData} 
@@ -215,24 +219,42 @@
         onHoverDate={(date) => globalHoveredDate = date}
         onDateSelect={(date) => selectedDate = date}
       />
-      <div class="flex flex-col gap-6 min-h-0">
-        <div class="flex flex-col shrink-0">
-          <DaylightChart 
-            bind:derivativeCount
-            {yearData} 
-            {selectedDate} 
-            {latitude}
-            {longitude}
-            {timezone}
-            hoveredDate={globalHoveredDate}
-            onHoverDate={(date) => globalHoveredDate = date}
-            onDateSelect={(date) => selectedDate = date}
-          />
-        </div>
-        <div class="flex flex-col min-h-0 shrink-0">
-          <SunPathChart {selectedDate} {latitude} {longitude} {timezone} />
-        </div>
-      </div>
+      <DaylightChart 
+        bind:derivativeCount
+        {yearData} 
+        {selectedDate} 
+        {latitude}
+        {longitude}
+        {timezone}
+        hoveredDate={globalHoveredDate}
+        onHoverDate={(date) => globalHoveredDate = date}
+        onDateSelect={(date) => selectedDate = date}
+      />
+    </div>
+    
+    <!-- Row 2: Sun position by date | Sun path -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      <SunAzimuthChart
+        {yearData}
+        {selectedDate}
+        {latitude}
+        {longitude}
+        {timezone}
+        hoveredDate={globalHoveredDate}
+        onHoverDate={(date) => globalHoveredDate = date}
+        onDateSelect={(date) => selectedDate = date}
+        hoveredHour={globalHoveredHour}
+        onHoverHour={(h) => globalHoveredHour = h}
+        bind:selectedHour={sunAzimuthSelectedHour}
+      />
+      <SunPathChart
+        {selectedDate}
+        {latitude}
+        {longitude}
+        {timezone}
+        highlightHour={sunAzimuthSelectedHour}
+        onHoverHour={(h) => globalHoveredHour = h}
+      />
     </div>
     
     <!-- Bottom section: Stats and Upcoming Dates side by side -->

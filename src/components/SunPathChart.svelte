@@ -2,7 +2,7 @@
   import { getSunPathForDay, getSunData, getSunPosition } from '../lib/solar.js';
   import { formatTimeInTimezone, getHourInTimezone } from '../lib/utils.js';
 
-  let { selectedDate, latitude, longitude, timezone } = $props();
+  let { selectedDate, latitude, longitude, timezone, highlightHour = null, onHoverHour = null } = $props();
 
   const size = 280;
   const center = size / 2;
@@ -116,6 +116,35 @@
     return { x, y };
   });
 
+  // Highlight marker: show position at highlightHour (from SunAzimuthChart's slider)
+  let highlightPoint = $derived.by(() => {
+    if (highlightHour == null || !pathPoints.length) return null;
+    // Find the path point closest to the highlight hour
+    let best = null;
+    let bestDiff = Infinity;
+    for (const p of pathPoints) {
+      const h = getHourInTimezone(p.time, timezone);
+      const diff = Math.abs(h - highlightHour);
+      if (diff < bestDiff) { bestDiff = diff; best = p; }
+    }
+    if (!best || bestDiff > 0.5) return null; // within ~30 min
+    return best;
+  });
+
+  let highlightPolarPos = $derived.by(() => {
+    if (!highlightPoint) return null;
+    return altAzToXY(highlightPoint.altitude, highlightPoint.azimuth);
+  });
+
+  let highlightAltPos = $derived.by(() => {
+    if (!highlightPoint) return null;
+    const hour = getHourInTimezone(highlightPoint.time, timezone);
+    const x = altChartPadding.left + (hour / 24) * altChartPlotWidth;
+    const altClamp = Math.max(altMin, Math.min(altMax, highlightPoint.altitude));
+    const y = altChartPadding.top + altChartPlotHeight - ((altClamp - altMin) / altRange) * altChartPlotHeight;
+    return { x, y };
+  });
+
   // Mark sunrise, solar noon, sunset if available
   let markers = $derived.by(() => {
     const m = [];
@@ -124,13 +153,15 @@
     const risePos = getSunPosition(sunData.sunrise, latitude, longitude);
     const setPos = getSunPosition(sunData.sunset, latitude, longitude);
     const noonPos = getSunPosition(noon, latitude, longitude);
-    m.push({ label: 'Sunrise', alt: risePos.altitude, az: risePos.azimuth, time: sunData.sunrise });
+    // Clamp sunrise/sunset altitude to 0: SunCalc's getPosition returns geometric altitude (~-0.833°)
+    // but sunrise/sunset are defined at the apparent horizon (0° after refraction correction)
+    m.push({ label: 'Sunrise', alt: 0, az: risePos.azimuth, time: sunData.sunrise });
     m.push({ label: 'Noon', alt: noonPos.altitude, az: noonPos.azimuth, time: noon });
-    m.push({ label: 'Sunset', alt: setPos.altitude, az: setPos.azimuth, time: sunData.sunset });
+    m.push({ label: 'Sunset', alt: 0, az: setPos.azimuth, time: sunData.sunset });
     return m;
   });
 
-  // Polar: find nearest path point to (svgX, svgY)
+  // Polar: find nearest path point or marker to (svgX, svgY)
   function handlePolarMouseMove(event) {
     if (!pathPoints.length) return;
     const svg = event.currentTarget;
@@ -139,45 +170,73 @@
     const scaleY = size / rect.height;
     const svgX = (event.clientX - rect.left) * scaleX;
     const svgY = (event.clientY - rect.top) * scaleY;
+    // Check markers first (sunrise/sunset/noon) - they have priority within close range
     let best = null;
     let bestD2 = Infinity;
-    for (const p of pathPoints) {
-      const { x, y } = altAzToXY(p.altitude, p.azimuth);
+    for (const m of markers) {
+      const { x, y } = altAzToXY(m.alt, m.az);
       const d2 = (x - svgX) ** 2 + (y - svgY) ** 2;
-      if (d2 < bestD2) { bestD2 = d2; best = p; }
+      if (d2 < bestD2 && d2 < 45) { bestD2 = d2; best = { time: m.time, altitude: m.alt, azimuth: m.az }; }
+    }
+    // Fall back to path points
+    if (!best) {
+      for (const p of pathPoints) {
+        const { x, y } = altAzToXY(p.altitude, p.azimuth);
+        const d2 = (x - svgX) ** 2 + (y - svgY) ** 2;
+        if (d2 < bestD2) { bestD2 = d2; best = p; }
+      }
     }
     if (best) {
       tooltip = { time: best.time, altitude: best.altitude, azimuth: best.azimuth };
       tooltipX = event.clientX;
       tooltipY = event.clientY;
+      onHoverHour?.(getHourInTimezone(best.time, timezone));
     }
   }
   function handlePolarMouseLeave() {
     tooltip = null;
+    onHoverHour?.(null);
   }
 
-  // Altitude chart: get point from x only (no loop). Same 5-min resolution as polar plot.
+  // Altitude chart: get point from x only. Check markers first for snapping.
   function handleAltChartMouseMove(event) {
     if (!pathPoints.length) return;
     const svg = event.currentTarget;
     const rect = svg.getBoundingClientRect();
     const scaleX = altChartWidth / rect.width;
     const svgX = (event.clientX - rect.left) * scaleX;
+    const svgY = (event.clientY - rect.top) * (altChartHeight / rect.height);
     const frac = (svgX - altChartPadding.left) / altChartPlotWidth;
     if (frac < 0 || frac > 1) return;
-    const index = Math.max(0, Math.min(pathPoints.length - 1, Math.round(frac * (pathPoints.length - 1))));
-    const best = pathPoints[index];
+    // Check markers first (sunrise/sunset/noon snap)
+    let best = null;
+    let bestD2 = Infinity;
+    for (const m of markers) {
+      const hour = getHourInTimezone(m.time, timezone);
+      const mx = altChartPadding.left + (hour / 24) * altChartPlotWidth;
+      const altClamp = Math.max(altMin, Math.min(altMax, m.alt));
+      const my = altChartPadding.top + altChartPlotHeight - ((altClamp - altMin) / altRange) * altChartPlotHeight;
+      const d2 = (mx - svgX) ** 2 + (my - svgY) ** 2;
+      if (d2 < bestD2 && d2 < 45) { bestD2 = d2; best = { time: m.time, altitude: m.alt, azimuth: m.az }; }
+    }
+    // Fall back to path point by x position
+    if (!best) {
+      const index = Math.max(0, Math.min(pathPoints.length - 1, Math.round(frac * (pathPoints.length - 1))));
+      best = pathPoints[index];
+    }
     tooltip = { time: best.time, altitude: best.altitude, azimuth: best.azimuth };
     tooltipX = event.clientX;
     tooltipY = event.clientY;
+    onHoverHour?.(getHourInTimezone(best.time, timezone));
   }
   function handleAltChartMouseLeave() {
     tooltip = null;
+    onHoverHour?.(null);
   }
 
   // Clear tooltip on scroll or touchmove so it doesn't stick on mobile
   $effect(() => {
-    const clear = () => { tooltip = null; };
+    const clear = () => { tooltip = null; onHoverHour?.(null); };
     window.addEventListener('scroll', clear, true);
     window.addEventListener('touchmove', clear, true);
     return () => {
@@ -294,6 +353,18 @@
           {m.label} {formatTimeInTimezone(m.time, timezone)}
         </text>
       {/each}
+      <!-- Highlight marker from SunAzimuthChart hour (blue) -->
+      {#if highlightPolarPos && !tooltipPolarPos}
+        <circle
+          cx={highlightPolarPos.x}
+          cy={highlightPolarPos.y}
+          r="5"
+          fill="rgb(59, 130, 246)"
+          fill-opacity="0.8"
+          stroke="white"
+          stroke-width="1"
+        />
+      {/if}
       <!-- Hover marker on polar plot -->
       {#if tooltipPolarPos}
         <circle
@@ -341,6 +412,27 @@
           stroke-linecap="round"
           stroke-linejoin="round"
         />
+        <!-- Highlight marker from SunAzimuthChart hour (blue) -->
+        {#if highlightAltPos && !tooltipAltPos}
+          <line
+            x1={highlightAltPos.x}
+            y1={altChartPadding.top}
+            x2={highlightAltPos.x}
+            y2={altChartPadding.top + altChartPlotHeight}
+            stroke="rgb(59, 130, 246)"
+            stroke-width="1"
+            stroke-dasharray="2,2"
+            stroke-opacity="0.6"
+          />
+          <circle
+            cx={highlightAltPos.x}
+            cy={highlightAltPos.y}
+            r="4"
+            fill="rgb(59, 130, 246)"
+            stroke="white"
+            stroke-width="1"
+          />
+        {/if}
         <!-- Hover marker on altitude chart -->
         {#if tooltipAltPos}
           <line

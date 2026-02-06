@@ -196,7 +196,7 @@
   });
 </script>
 
-<div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm flex flex-col">
+<div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm grid h-full" style="grid-template-rows: auto 1fr;">
   <div class="flex items-center justify-between mb-3">
     <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">Daylight Through the Year</h3>
     <label class="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
@@ -214,12 +214,12 @@
       />
     </label>
   </div>
-  <div class="min-h-0">
+  <div class="min-h-0 relative">
   <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions a11y_no_noninteractive_element_interactions -->
   <svg
     viewBox="0 0 {width} {height}"
-    class="w-full max-w-3xl cursor-pointer outline-none"
-    style="max-height: 320px;"
+    class="absolute inset-0 w-full h-full cursor-pointer outline-none"
+    preserveAspectRatio="xMidYMid meet"
     onclick={handleChartClick}
     onmousemove={handleChartMouseMove}
     onmouseleave={handleChartMouseLeave}
