@@ -1,3 +1,5 @@
+import { LRUCache, CACHE_MAX_MEDIUM } from './cache.js';
+
 /**
  * Add days to a date
  * @param {Date} date - The starting date
@@ -304,18 +306,17 @@ function _getFormatter(timezone, options) {
   return fmt;
 }
 
-const _calDayCache = new Map();
+const _calDayCache = new LRUCache(CACHE_MAX_MEDIUM);
 export function getCalendarDayInTimezone(date, timezone) {
   const ts = date.getTime();
   const key = `${ts}:${timezone}`;
-  let result = _calDayCache.get(key);
-  if (result) return result;
+  const cached = _calDayCache.get(key);
+  if (cached) return cached;
 
   const formatter = _getFormatter(timezone, { year: 'numeric', month: '2-digit', day: '2-digit' });
   const parts = formatter.formatToParts(date);
   const get = (type) => parseInt(parts.find((p) => p.type === type).value, 10);
-  result = { year: get('year'), month: get('month'), day: get('day') };
-  if (_calDayCache.size > 5000) _calDayCache.clear();
+  const result = { year: get('year'), month: get('month'), day: get('day') };
   _calDayCache.set(key, result);
   return result;
 }
@@ -327,17 +328,16 @@ export function getCalendarDayInTimezone(date, timezone) {
  * @param {string} timezone - IANA timezone name
  * @returns {number}
  */
-const _hourInTzCache = new Map();
+const _hourInTzCache = new LRUCache(CACHE_MAX_MEDIUM);
 export function getHourInTimezone(date, timezone) {
   const ts = date.getTime();
   const key = `${ts}:${timezone}`;
-  let result = _hourInTzCache.get(key);
-  if (result !== undefined) return result;
+  const cached = _hourInTzCache.get(key);
+  if (cached !== undefined) return cached;
 
   const { year, month, day } = getCalendarDayInTimezone(date, timezone);
   const midnight = dateAtLocalInTimezone(year, month, day, 0, 0, timezone);
-  result = (ts - midnight.getTime()) / 3600000;
-  if (_hourInTzCache.size > 5000) _hourInTzCache.clear();
+  const result = (ts - midnight.getTime()) / 3600000;
   _hourInTzCache.set(key, result);
   return result;
 }
@@ -352,10 +352,10 @@ export function getHourInTimezone(date, timezone) {
  * @param {string} timezone - IANA timezone name
  * @returns {Date}
  */
-const _dateAtLocalCache = new Map();
+const _dateAtLocalCache = new LRUCache(CACHE_MAX_MEDIUM);
 export function dateAtLocalInTimezone(year, month, day, hour, min, timezone) {
   const key = `${year}:${month}:${day}:${hour}:${min}:${timezone}`;
-  let cached = _dateAtLocalCache.get(key);
+  const cached = _dateAtLocalCache.get(key);
   if (cached) return cached;
 
   const formatter = _getFormatter(timezone, { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
@@ -367,7 +367,6 @@ export function dateAtLocalInTimezone(year, month, day, hour, min, timezone) {
     const y0 = get('year'), m0 = get('month'), d0 = get('day'), h0 = get('hour'), min0 = get('minute');
     if (y0 === year && m0 === month && d0 === day && h0 === 0 && min0 === 0) {
       const result = new Date(M + hour * 3600000 + min * 60000);
-      if (_dateAtLocalCache.size > 5000) _dateAtLocalCache.clear();
       _dateAtLocalCache.set(key, result);
       return result;
     }
@@ -380,7 +379,6 @@ export function dateAtLocalInTimezone(year, month, day, hour, min, timezone) {
     }
   }
   const result = new Date(M + hour * 3600000 + min * 60000);
-  if (_dateAtLocalCache.size > 5000) _dateAtLocalCache.clear();
   _dateAtLocalCache.set(key, result);
   return result;
 }
