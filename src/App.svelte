@@ -171,6 +171,16 @@
         // Snap to next 0.5° boundary below
         latitude = Math.max(-90, Math.floor((latitude - 0.01) * 2) / 2);
       }
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      const d = new Date(selectedDate);
+      d.setDate(d.getDate() + (e.shiftKey ? 7 : 1));
+      selectedDate = d;
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      const d = new Date(selectedDate);
+      d.setDate(d.getDate() - (e.shiftKey ? 7 : 1));
+      selectedDate = d;
     }
   }
 </script>
