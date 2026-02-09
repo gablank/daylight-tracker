@@ -9,6 +9,7 @@
   let tooltipY = $state(0);
   
   function handleDateChange(e) {
+    if (!e.target.value) return; // native date input returns "" for invalid/incomplete dates
     const newDate = parseDateISO(e.target.value);
     selectedDate = newDate;
     onchange?.(selectedDate);
