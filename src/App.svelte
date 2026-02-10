@@ -1,6 +1,7 @@
 <script>
+  import { setContext } from 'svelte';
   import { computeYearData, getSunData, findOppositeDate, formatDateShort, formatDuration, findUpcomingSunriseMilestones, findUpcomingSunsetMilestones, findUpcomingDSTChanges, findUpcomingDaylightMilestones } from './lib/solar.js';
-  import { getToday, getLocalTimezone, formatTimeInTimezone, formatDateISO } from './lib/utils.js';
+  import { getToday, getLocalTimezone, formatTimeInTimezone, formatDateISO, parseDateISO } from './lib/utils.js';
   
   import LatitudeSelector from './components/LatitudeSelector.svelte';
   import DatePicker from './components/DatePicker.svelte';
@@ -10,10 +11,16 @@
   import SunAzimuthChart from './components/SunAzimuthChart.svelte';
   import TwilightChart from './components/TwilightChart.svelte';
   import WorldMap from './components/WorldMap.svelte';
+  import SectionLink from './components/SectionLink.svelte';
   import StatsTable from './components/StatsTable.svelte';
   import UpcomingDates from './components/UpcomingDates.svelte';
   
   const STORAGE_KEY = 'daylight-tracker-settings';
+  
+  // Parse URL params (for deep linking / sharing)
+  const initParams = new URLSearchParams(window.location.search);
+  const urlHasState = initParams.has('lat') || initParams.has('lon') || initParams.has('tz') || initParams.has('date');
+  let soloSection = $state(initParams.get('view'));
   
   // State - Default to Oslo
   let latitude = $state(59.9);
@@ -31,41 +38,58 @@
   let globalHoveredHour = $state(null);
   let sunAzimuthSelectedHour = $state(12);
   
-  // Load settings from localStorage on mount (selectedDate always defaults to today)
+  // Load settings: URL params (highest priority) > localStorage > geolocation > defaults
   $effect(() => {
     if (settingsLoaded) return;
     
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      try {
-        const settings = JSON.parse(stored);
-        if (settings.latitude !== undefined) latitude = settings.latitude;
-        if (settings.longitude !== undefined) longitude = settings.longitude;
-        if (settings.timezone) timezone = settings.timezone;
-        if (settings.derivativeCount !== undefined) derivativeCount = Math.max(1, Math.min(5, settings.derivativeCount));
-        if (settings.settingsExpanded !== undefined) settingsExpanded = settings.settingsExpanded;
-        if (settings.mapExpanded !== undefined) mapExpanded = settings.mapExpanded;
-        // Note: selectedDate is NOT restored - always use current date on page load
-        settingsLoaded = true;
-      } catch {
-        // Invalid stored settings, will use defaults
-        settingsLoaded = true;
+    if (urlHasState || soloSection) {
+      // URL params override everything (shared link) — collapse settings by default
+      const lat = parseFloat(initParams.get('lat'));
+      const lon = parseFloat(initParams.get('lon'));
+      const tz = initParams.get('tz');
+      const dateStr = initParams.get('date');
+      if (!isNaN(lat)) latitude = lat;
+      if (!isNaN(lon)) longitude = lon;
+      if (tz) timezone = tz;
+      if (dateStr) {
+        const d = parseDateISO(dateStr);
+        if (d && !isNaN(d.getTime())) selectedDate = d;
       }
-    } else {
-      // No stored settings - try geolocation
+      settingsExpanded = false;
       settingsLoaded = true;
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            latitude = Math.round(position.coords.latitude * 10) / 10;
-            longitude = Math.round(position.coords.longitude * 10) / 10;
-            timezone = getLocalTimezone();
-          },
-          () => {
-            // Silently fail, keep default
-          },
-          { enableHighAccuracy: false, timeout: 5000, maximumAge: 300000 }
-        );
+    } else {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        try {
+          const settings = JSON.parse(stored);
+          if (settings.latitude !== undefined) latitude = settings.latitude;
+          if (settings.longitude !== undefined) longitude = settings.longitude;
+          if (settings.timezone) timezone = settings.timezone;
+          if (settings.derivativeCount !== undefined) derivativeCount = Math.max(1, Math.min(5, settings.derivativeCount));
+          if (settings.settingsExpanded !== undefined) settingsExpanded = settings.settingsExpanded;
+          if (settings.mapExpanded !== undefined) mapExpanded = settings.mapExpanded;
+          // Note: selectedDate is NOT restored - always use current date on page load
+          settingsLoaded = true;
+        } catch {
+          // Invalid stored settings, will use defaults
+          settingsLoaded = true;
+        }
+      } else {
+        // No stored settings - try geolocation
+        settingsLoaded = true;
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              latitude = Math.round(position.coords.latitude * 10) / 10;
+              longitude = Math.round(position.coords.longitude * 10) / 10;
+              timezone = getLocalTimezone();
+            },
+            () => {
+              // Silently fail, keep default
+            },
+            { enableHighAccuracy: false, timeout: 5000, maximumAge: 300000 }
+          );
+        }
       }
     }
   });
@@ -82,6 +106,62 @@
       settingsExpanded,
       mapExpanded
     }));
+  });
+  
+  // Share-URL builder (provided to SectionLink components via context)
+  setContext('getShareUrl', (sectionId, solo) => {
+    const url = new URL(window.location.href);
+    url.search = '';
+    url.hash = '';
+    url.searchParams.set('lat', latitude.toFixed(1));
+    url.searchParams.set('lon', longitude.toFixed(1));
+    url.searchParams.set('tz', timezone);
+    url.searchParams.set('date', formatDateISO(selectedDate));
+    if (solo) {
+      url.searchParams.set('view', sectionId);
+    } else {
+      url.hash = sectionId;
+    }
+    return url.toString();
+  });
+  
+  function shouldShow(id) {
+    return !soloSection || soloSection === id;
+  }
+  
+  function showAllSections() {
+    soloSection = null;
+    const url = new URL(window.location.href);
+    url.searchParams.delete('view');
+    window.history.pushState({}, '', url.toString());
+  }
+  
+  // Navigate to solo view for a section (updates URL + state)
+  setContext('navigateToSection', (sectionId) => {
+    soloSection = sectionId;
+    const url = new URL(window.location.href);
+    url.search = '';
+    url.hash = '';
+    url.searchParams.set('lat', latitude.toFixed(1));
+    url.searchParams.set('lon', longitude.toFixed(1));
+    url.searchParams.set('tz', timezone);
+    url.searchParams.set('date', formatDateISO(selectedDate));
+    url.searchParams.set('view', sectionId);
+    window.history.pushState({}, '', url.toString());
+  });
+  
+  setContext('showAllSections', () => showAllSections());
+  setContext('getSoloSection', () => soloSection);
+  
+  // Scroll to hash target after content renders
+  $effect(() => {
+    if (!settingsLoaded) return;
+    if (window.location.hash) {
+      requestAnimationFrame(() => {
+        const el = document.getElementById(window.location.hash.slice(1));
+        if (el) el.scrollIntoView({ behavior: 'smooth' });
+      });
+    }
   });
   
   // Computed year data (recomputes when latitude or year changes)
@@ -185,7 +265,10 @@
   }
 </script>
 
-<svelte:window onkeydown={handleGlobalKeydown} />
+<svelte:window onkeydown={handleGlobalKeydown} onpopstate={() => {
+  const params = new URLSearchParams(window.location.search);
+  soloSection = params.get('view');
+}} />
 
 <div class="min-h-screen bg-gray-100 dark:bg-gray-900">
   <!-- Sticky bar: selected day summary + settings toggle -->
@@ -196,9 +279,13 @@
     <div class="max-w-7xl mx-auto px-4 py-3">
       <div class="flex flex-nowrap items-center justify-between gap-2 sm:gap-3 min-w-0">
         <div class="flex flex-wrap items-center gap-2 sm:gap-4 md:gap-6 min-w-0 flex-1">
-          <h1 class="text-lg font-bold text-gray-900 dark:text-gray-100 shrink-0">
+          <a
+            href="/"
+            class="text-lg font-bold text-gray-900 dark:text-gray-100 shrink-0 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+            onclick={(e) => { e.preventDefault(); showAllSections(); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+          >
             Daylight Tracker
-          </h1>
+          </a>
           {#if sunData}
             <div class="flex flex-wrap items-center gap-2 sm:gap-3 md:gap-5 text-sm min-w-0">
               <span class="font-medium text-gray-700 dark:text-gray-300 shrink-0">
@@ -329,32 +416,38 @@
     {/if}
   </div>
 
-  <div class="max-w-7xl mx-auto px-4 py-8">
-    <!-- World map (collapsible) -->
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden mb-6">
-      <button
-        type="button"
-        class="w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-        onclick={() => mapExpanded = !mapExpanded}
-        aria-expanded={mapExpanded}
-      >
-        <h3 class="text-sm font-medium">World map</h3>
-        <svg
-          class="w-4 h-4 transition-transform {mapExpanded ? 'rotate-180' : ''}"
-          fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"
+  {#snippet sectionMap()}
+    <div id="map" class="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
+      <div class="flex items-center justify-between px-4 py-2.5">
+        <div class="flex items-center gap-0.5">
+          <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">World map</h3>
+          <SectionLink id="map" />
+        </div>
+        <button
+          type="button"
+          class="p-1 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+          onclick={() => mapExpanded = !mapExpanded}
+          aria-expanded={mapExpanded}
+          aria-label={mapExpanded ? 'Collapse map' : 'Expand map'}
         >
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
+          <svg
+            class="w-4 h-4 transition-transform {mapExpanded ? 'rotate-180' : ''}"
+            fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+      </div>
       {#if mapExpanded}
         <div class="px-4 pb-4">
           <WorldMap bind:latitude bind:longitude selectedDate={globalHoveredDate ?? selectedDate} {timezone} displayHour={globalHoveredHour ?? sunAzimuthSelectedHour} />
         </div>
       {/if}
     </div>
+  {/snippet}
 
-    <!-- Row 1: Year overview | Daylight throughout the year (with twilight) -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+  {#snippet sectionYearOverview()}
+    <div id="year-overview">
       <YearGraph 
         {selectedDate} 
         {yearData} 
@@ -366,59 +459,66 @@
         onHoverDate={(date) => globalHoveredDate = date}
         onDateSelect={(date) => selectedDate = date}
       />
-      <div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm flex flex-col h-full">
-        <div class="flex items-center justify-between mb-3">
+    </div>
+  {/snippet}
+
+  {#snippet sectionDaylight()}
+    <div id="daylight" class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm flex flex-col h-full">
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-0.5">
           <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">Daylight throughout the year</h3>
-          <label class="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
-            <span>Derivatives:</span>
-            <input
-              type="number"
-              min="1"
-              max="5"
-              value={derivativeCount}
-              oninput={(e) => {
-                const v = parseInt(e.currentTarget.value, 10);
-                if (!isNaN(v)) derivativeCount = Math.max(1, Math.min(5, v));
-              }}
-              class="w-14 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 py-1 text-gray-900 dark:text-gray-100 text-center focus:outline-none focus:ring-0"
-            />
-          </label>
+          <SectionLink id="daylight" />
         </div>
-        <div class="flex-1 min-h-0 flex flex-col gap-2">
-          <div class="flex-1 min-h-0">
-            <DaylightChart 
-              bind:derivativeCount
-              {yearData} 
-              {selectedDate} 
-              {oppositeDate}
-              {latitude}
-              {longitude}
-              {timezone}
-              hoveredDate={globalHoveredDate}
-              onHoverDate={(date) => globalHoveredDate = date}
-              onDateSelect={(date) => selectedDate = date}
-            />
-          </div>
-          <div class="flex-1 min-h-0">
-            <TwilightChart
-              {yearData}
-              {selectedDate}
-              {oppositeDate}
-              {latitude}
-              {longitude}
-              {timezone}
-              {derivativeCount}
-              hoveredDate={globalHoveredDate}
-              onHoverDate={(date) => globalHoveredDate = date}
-              onDateSelect={(date) => selectedDate = date}
-            />
-          </div>
+        <label class="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+          <span>Derivatives:</span>
+          <input
+            type="number"
+            min="1"
+            max="5"
+            value={derivativeCount}
+            oninput={(e) => {
+              const v = parseInt(e.currentTarget.value, 10);
+              if (!isNaN(v)) derivativeCount = Math.max(1, Math.min(5, v));
+            }}
+            class="w-14 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 py-1 text-gray-900 dark:text-gray-100 text-center focus:outline-none focus:ring-0"
+          />
+        </label>
+      </div>
+      <div class="flex-1 min-h-0 flex flex-col gap-2">
+        <div class="flex-1 min-h-0">
+          <DaylightChart 
+            bind:derivativeCount
+            {yearData} 
+            {selectedDate} 
+            {oppositeDate}
+            {latitude}
+            {longitude}
+            {timezone}
+            hoveredDate={globalHoveredDate}
+            onHoverDate={(date) => globalHoveredDate = date}
+            onDateSelect={(date) => selectedDate = date}
+          />
+        </div>
+        <div class="flex-1 min-h-0">
+          <TwilightChart
+            {yearData}
+            {selectedDate}
+            {oppositeDate}
+            {latitude}
+            {longitude}
+            {timezone}
+            {derivativeCount}
+            hoveredDate={globalHoveredDate}
+            onHoverDate={(date) => globalHoveredDate = date}
+            onDateSelect={(date) => selectedDate = date}
+          />
         </div>
       </div>
     </div>
-    
-    <!-- Row 2: Sun position by date | Sun path -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+  {/snippet}
+
+  {#snippet sectionSunPosition()}
+    <div id="sun-position">
       <SunAzimuthChart
         {yearData}
         {selectedDate}
@@ -433,6 +533,11 @@
         onHoverHour={(h) => globalHoveredHour = h}
         bind:selectedHour={sunAzimuthSelectedHour}
       />
+    </div>
+  {/snippet}
+
+  {#snippet sectionSunPath()}
+    <div id="sun-path">
       <SunPathChart
         {selectedDate}
         {latitude}
@@ -442,12 +547,74 @@
         onHoverHour={(h) => globalHoveredHour = h}
       />
     </div>
-    
-    <!-- Bottom section: Stats and Upcoming Dates side by side -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+  {/snippet}
+
+  {#snippet sectionStats()}
+    <div id="stats">
       <StatsTable {selectedDate} {yearData} {latitude} {longitude} {oppositeDate} {timezone} onDateSelect={(date) => selectedDate = date} onHoverDate={(date) => globalHoveredDate = date} />
+    </div>
+  {/snippet}
+
+  {#snippet sectionUpcoming()}
+    <div id="upcoming">
       <UpcomingDates {selectedDate} {yearData} {latitude} {longitude} {timezone} onDateSelect={(date) => selectedDate = date} onHoverDate={(date) => globalHoveredDate = date} />
     </div>
+  {/snippet}
+
+  <div class="max-w-7xl mx-auto px-4 py-8">
+    {#if soloSection}
+      <div class="mb-4">
+        <button
+          type="button"
+          class="inline-flex items-center gap-1.5 text-sm text-blue-600 dark:text-blue-400 hover:underline"
+          onclick={showAllSections}
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+          </svg>
+          Show all sections
+        </button>
+      </div>
+    {/if}
+
+    {#if soloSection}
+      <!-- Solo mode: show only the selected section -->
+      {#if soloSection === 'map'}
+        {@render sectionMap()}
+      {:else if soloSection === 'year-overview'}
+        {@render sectionYearOverview()}
+      {:else if soloSection === 'daylight'}
+        {@render sectionDaylight()}
+      {:else if soloSection === 'sun-position'}
+        {@render sectionSunPosition()}
+      {:else if soloSection === 'sun-path'}
+        {@render sectionSunPath()}
+      {:else if soloSection === 'stats'}
+        {@render sectionStats()}
+      {:else if soloSection === 'upcoming'}
+        {@render sectionUpcoming()}
+      {/if}
+    {:else}
+      <!-- Full layout -->
+      <div class="mb-6">
+        {@render sectionMap()}
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        {@render sectionYearOverview()}
+        {@render sectionDaylight()}
+      </div>
+      
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        {@render sectionSunPosition()}
+        {@render sectionSunPath()}
+      </div>
+      
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {@render sectionStats()}
+        {@render sectionUpcoming()}
+      </div>
+    {/if}
     
     <!-- Footer -->
     <footer class="mt-12 text-center text-sm text-gray-500 dark:text-gray-400">

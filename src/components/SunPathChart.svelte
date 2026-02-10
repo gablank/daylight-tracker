@@ -1,6 +1,7 @@
 <script>
   import { getSunPathForDay, getSunData, getSunPosition } from '../lib/solar.js';
   import { formatTimeInTimezone, getHourInTimezone } from '../lib/utils.js';
+  import SectionLink from './SectionLink.svelte';
 
   let { selectedDate, latitude, longitude, timezone, highlightHour = null, onHoverHour = null } = $props();
 
@@ -247,7 +248,10 @@
 </script>
 
 <div class="min-h-0 bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm flex flex-col">
-  <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 shrink-0">Sun path</h3>
+  <div class="flex items-center gap-0.5 mb-2 shrink-0">
+    <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">Sun path</h3>
+    <SectionLink id="sun-path" />
+  </div>
   <div class="flex flex-wrap items-start justify-center gap-4 min-h-0">
     <!-- Polar sun path -->
     <div class="flex flex-col shrink-0 w-full max-w-[280px] overflow-visible">

@@ -1,6 +1,7 @@
 <script>
   import { getDayOfYear, getSunPosition, formatDateShort } from '../lib/solar.js';
   import { dateAtLocalInTimezone } from '../lib/utils.js';
+  import SectionLink from './SectionLink.svelte';
 
   let { yearData, selectedDate, oppositeDate = null, latitude = 0, longitude = 0, timezone = null, hoveredDate = null, onHoverDate = null, onDateSelect = null, hoveredHour = null, onHoverHour = null, selectedHour = $bindable(12) } = $props();
 
@@ -204,7 +205,10 @@
 
 <div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm flex flex-col">
   <div class="flex items-center justify-between mb-3">
-    <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">Sun position by date</h3>
+    <div class="flex items-center gap-0.5">
+      <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">Sun position by date</h3>
+      <SectionLink id="sun-position" />
+    </div>
     <label class="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
       <span>Hour:</span>
       <input

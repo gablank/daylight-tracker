@@ -1,5 +1,6 @@
 <script>
   import { getDateAngle, formatDateShort, formatDuration, getDaysInYear, getWinterSolstice, getSummerSolstice, getMarchEquinox, getSeptemberEquinox, getDayOfYear, getSeasonName, getDayStatsForTooltip } from '../lib/solar.js';
+  import SectionLink from './SectionLink.svelte';
   
   let { selectedDate, yearData, oppositeDate, latitude = 0, longitude = 0, timezone = null, hoveredDate = null, onHoverDate = null, onDateSelect = null } = $props();
   
@@ -269,7 +270,10 @@
 
 <div class="h-full bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm flex flex-col">
   <div class="flex items-center justify-between mb-3">
-    <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">Year overview</h3>
+    <div class="flex items-center gap-0.5">
+      <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">Year overview</h3>
+      <SectionLink id="year-overview" />
+    </div>
     
     <!-- Direction toggle -->
     <label class="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400 cursor-pointer">

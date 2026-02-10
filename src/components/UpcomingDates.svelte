@@ -1,4 +1,5 @@
 <script>
+  import SectionLink from './SectionLink.svelte';
   import { 
     formatDateShort, 
     getDayStatsForTooltip,
@@ -219,7 +220,10 @@
 </script>
 
 <div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
-  <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">Noteworthy upcoming dates</h3>
+  <div class="flex items-center gap-0.5 mb-4">
+    <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">Noteworthy upcoming dates</h3>
+    <SectionLink id="upcoming" />
+  </div>
   
   {#if groupedEvents.length > 0}
     <div class="overflow-x-auto">

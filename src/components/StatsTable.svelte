@@ -1,6 +1,7 @@
 <script>
   import { formatDuration, formatDateShort, getSunData, findDateWithGain, getDayOfYear, getDayStatsForTooltip } from '../lib/solar.js';
   import { addDays, formatDurationChange } from '../lib/utils.js';
+  import SectionLink from './SectionLink.svelte';
   
   let { selectedDate, yearData, latitude, oppositeDate, longitude = 0, timezone = null, onDateSelect = null, onHoverDate = null } = $props();
 
@@ -102,7 +103,10 @@
 </script>
 
 <div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
-  <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">Daylight statistics</h3>
+  <div class="flex items-center gap-0.5 mb-4">
+    <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">Daylight statistics</h3>
+    <SectionLink id="stats" />
+  </div>
   
   <!-- Mirror Date section (full width) -->
   {#if mirrorDateInfo}
