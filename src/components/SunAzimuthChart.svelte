@@ -226,8 +226,8 @@
   <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions a11y_no_noninteractive_element_interactions -->
   <svg
     viewBox="0 0 {width} {height}"
-    class="w-full max-w-3xl cursor-pointer outline-none"
-    style="max-height: 320px;"
+    class="w-full cursor-pointer outline-none"
+    style="aspect-ratio: {width} / {height};"
     onclick={handleClick}
     onmousemove={handleMouseMove}
     onmouseleave={handleMouseLeave}
