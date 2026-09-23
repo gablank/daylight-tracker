@@ -54,7 +54,8 @@
         date: formatDateShort(date),
         dateObj: date,
         daylight: formatDuration(futureData.daylight),
-        change: formatDurationChange(change),
+        fraction: futureData.daylight / 86400000,
+        change: formatDurationChange(change).replace('-', '−'),
         isGain: change >= 0
       };
     });
@@ -97,9 +98,9 @@
   // Section 4: Twilight phase lengths on the selected day
   let twilight = $derived(selectedDate ? getTwilightInfo(selectedDate, latitude, longitude, timezone) : null);
   const twilightPhases = [
-    { key: 'civil', label: 'Civil', range: '0° to −6°' },
-    { key: 'nautical', label: 'Nautical', range: '−6° to −12°' },
-    { key: 'astronomical', label: 'Astronomical', range: '−12° to −18°' },
+    { key: 'civil', label: 'Civil', range: '0° to −6°', color: 'var(--color-civil)' },
+    { key: 'nautical', label: 'Nautical', range: '−6° to −12°', color: 'var(--color-nautical)' },
+    { key: 'astronomical', label: 'Astronomical', range: '−12° to −18°', color: 'var(--color-astro)' },
   ];
 
   function formatPhase(value) {
@@ -121,18 +122,20 @@
 </script>
 
 <ChartCard id="stats" title="Daylight statistics" subtitle="How daylight will change over the coming weeks, and when it reaches each amount.">
+  <div class="@container">
   
   <!-- Mirror Date section (full width) -->
   {#if mirrorDateInfo}
     <div class="mb-6">
       <h4 class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
-        Mirror Date
+        Mirror date
       </h4>
-      <div class="bg-orange-50 dark:bg-orange-900/20 rounded-md p-3">
+      <div class="flex items-start gap-3 rounded-lg bg-gray-50 p-3 dark:bg-gray-900/40">
+        <span class="mt-0.5 inline-block h-4 w-4 shrink-0 rounded-full border-2 border-dashed border-gray-900 dark:border-white" aria-hidden="true"></span>
         <p class="text-sm text-gray-700 dark:text-gray-300">
           <button
             type="button"
-            class="font-semibold text-orange-600 dark:text-orange-400 cursor-pointer hover:underline focus:outline-none focus:ring-2 focus:ring-orange-400 rounded px-0.5 -mx-0.5"
+            class="-mx-0.5 cursor-pointer rounded px-0.5 font-semibold text-gray-900 underline decoration-dotted underline-offset-2 hover:decoration-solid focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-white"
             onclick={() => { setHovered(null); onDateSelect?.(mirrorDateInfo.dateObj); }}
             onmouseenter={(e) => { setHovered(mirrorDateInfo.dateObj); tooltipX = e.clientX; tooltipY = e.clientY; }}
             onmousemove={(e) => { tooltipX = e.clientX; tooltipY = e.clientY; }}
@@ -148,20 +151,20 @@
   {/if}
   
   <!-- Two tables side by side -->
-  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+  <div class="grid grid-cols-1 @2xl:grid-cols-2 gap-6">
     <!-- Future Daylight -->
     <div>
       <h4 class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
-        Future Daylight
+        Future daylight
       </h4>
       <div class="overflow-x-auto">
-        <table class="w-full text-sm">
+        <table class="w-full whitespace-nowrap text-sm">
           <thead>
             <tr class="border-b border-gray-200 dark:border-gray-700">
               <th class="text-left py-2 pr-3 font-medium text-gray-600 dark:text-gray-400">Period</th>
               <th class="text-left py-2 pr-3 font-medium text-gray-600 dark:text-gray-400">Date</th>
               <th class="text-left py-2 pr-3 font-medium text-gray-600 dark:text-gray-400">Daylight</th>
-              <th class="text-left py-2 font-medium text-gray-600 dark:text-gray-400">Change</th>
+              <th class="text-right py-2 font-medium text-gray-600 dark:text-gray-400">Change</th>
             </tr>
           </thead>
           <tbody>
@@ -176,16 +179,21 @@
                 <td class="py-1.5 pr-3 text-gray-600 dark:text-gray-400 text-xs">
                   <button
                     type="button"
-                    class="cursor-pointer hover:underline focus:outline-none focus:ring-2 focus:ring-orange-400 rounded px-0.5 -mx-0.5 text-left"
+                    class="cursor-pointer hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded px-0.5 -mx-0.5 text-left"
                     onclick={() => { setHovered(null); onDateSelect?.(row.dateObj); }}
                   >
                     {row.date}
                   </button>
                 </td>
-                <td class="py-1.5 pr-3 text-gray-900 dark:text-gray-100 font-medium">{row.daylight}</td>
-                <td class="py-1.5 font-medium {row.isGain ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}">
-                  {row.change}
+                <td class="py-1.5 pr-3">
+                  <span class="flex items-center gap-2">
+                    <span class="relative h-1.5 w-12 shrink-0 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700" aria-hidden="true">
+                      <span class="absolute inset-y-0 left-0 rounded-full" style="width: {row.fraction * 100}%; background: var(--color-sun)"></span>
+                    </span>
+                    <span class="font-medium tabular-nums text-gray-900 dark:text-gray-100">{row.daylight}</span>
+                  </span>
                 </td>
+                <td class="py-1.5 text-right font-medium tabular-nums text-gray-700 dark:text-gray-300">{row.change}</td>
               </tr>
             {/each}
           </tbody>
@@ -196,10 +204,10 @@
     <!-- Daylight Changes -->
     <div>
       <h4 class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
-        Daylight Changes
+        Daylight changes
       </h4>
       <div class="overflow-x-auto">
-        <table class="w-full text-sm">
+        <table class="w-full whitespace-nowrap text-sm">
           <thead>
             <tr class="border-b border-gray-200 dark:border-gray-700">
               <th class="text-left py-2 pr-3 font-medium text-gray-600 dark:text-gray-400">Change</th>
@@ -215,12 +223,12 @@
                 onmousemove={(e) => { if (row.dateObj) { tooltipX = e.clientX; tooltipY = e.clientY; } }}
                 onmouseleave={() => setHovered(null)}
               >
-                <td class="py-1.5 pr-3 font-medium {row.isGain ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}">{row.label}</td>
+                <td class="py-1.5 pr-3 font-medium tabular-nums text-gray-900 dark:text-gray-100">{row.label.replace('-', '−')}</td>
                 <td class="py-1.5 pr-3 text-gray-600 dark:text-gray-400">
                   {#if row.dateObj}
                     <button
                       type="button"
-                      class="cursor-pointer hover:underline focus:outline-none focus:ring-2 focus:ring-orange-400 rounded px-0.5 -mx-0.5 text-left"
+                      class="cursor-pointer hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded px-0.5 -mx-0.5 text-left"
                       onclick={() => { setHovered(null); onDateSelect?.(row.dateObj); }}
                     >
                       {row.date}
@@ -238,14 +246,14 @@
     </div>
   </div>
 
-  <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+  <div class="grid grid-cols-1 @2xl:grid-cols-2 gap-6 mt-6">
     <!-- Solstice progress -->
     {#if solsticeProgress}
       {@const sinceLast = solsticeProgress.daylight - solsticeProgress.last.daylight}
       {@const untilNext = solsticeProgress.next.daylight - solsticeProgress.daylight}
       <div>
         <h4 class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
-          Solstice Progress
+          Solstice progress
         </h4>
         <div class="bg-gray-50 dark:bg-gray-700/30 rounded-md p-3 space-y-2 text-sm text-gray-700 dark:text-gray-300">
           {#each [
@@ -253,13 +261,13 @@
             { value: untilNext, text: 'to go until the', solstice: solsticeProgress.next },
           ] as row}
             <p>
-              <span class="font-semibold {row.value >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}">
-                {formatDurationChange(row.value)}
+              <span class="font-semibold tabular-nums text-gray-900 dark:text-gray-100">
+                {formatDurationChange(row.value).replace('-', '−')}
               </span>
               {row.text} {row.solstice.name}
               (<button
                 type="button"
-                class="cursor-pointer hover:underline focus:outline-none focus:ring-2 focus:ring-orange-400 rounded px-0.5 -mx-0.5"
+                class="cursor-pointer hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded px-0.5 -mx-0.5"
                 onclick={() => { setHovered(null); onDateSelect?.(row.solstice.date); }}
                 onmouseenter={(e) => { setHovered(row.solstice.date); tooltipX = e.clientX; tooltipY = e.clientY; }}
                 onmousemove={(e) => { tooltipX = e.clientX; tooltipY = e.clientY; }}
@@ -278,7 +286,7 @@
           Twilight on {formatDateShort(selectedDate)}
         </h4>
         <div class="overflow-x-auto">
-          <table class="w-full text-sm">
+          <table class="w-full whitespace-nowrap text-sm">
             <thead>
               <tr class="border-b border-gray-200 dark:border-gray-700">
                 <th class="text-left py-2 pr-3 font-medium text-gray-600 dark:text-gray-400">Phase</th>
@@ -290,7 +298,7 @@
               {#each twilightPhases as phase}
                 <tr class="border-b border-gray-100 dark:border-gray-700/50">
                   <td class="py-1.5 pr-3 text-gray-900 dark:text-gray-100">
-                    {phase.label} <span class="text-xs text-gray-500 dark:text-gray-400">({phase.range})</span>
+                    <span class="mr-1.5 inline-block h-2.5 w-2.5 rounded-sm ring-1 ring-black/10 dark:ring-white/15" style="background: {phase.color}" aria-hidden="true"></span>{phase.label} <span class="text-xs text-gray-500 dark:text-gray-400">({phase.range})</span>
                   </td>
                   {#if twilight.morning[phase.key] === 'all day'}
                     <td colspan="2" class="py-1.5 text-gray-900 dark:text-gray-100 font-medium">All day</td>
@@ -302,7 +310,7 @@
               {/each}
               <tr class="border-b border-gray-100 dark:border-gray-700/50">
                 <td class="py-1.5 pr-3 text-gray-900 dark:text-gray-100">
-                  True night <span class="text-xs text-gray-500 dark:text-gray-400">(below −18°)</span>
+                  <span class="mr-1.5 inline-block h-2.5 w-2.5 rounded-sm ring-1 ring-black/10 dark:ring-white/15" style="background: var(--color-night)" aria-hidden="true"></span>True night <span class="text-xs text-gray-500 dark:text-gray-400">(below −18°)</span>
                 </td>
                 <td colspan="2" class="py-1.5 text-gray-900 dark:text-gray-100 font-medium">
                   {twilight.night > 0 ? formatDuration(twilight.night) : 'None'}
@@ -319,6 +327,7 @@
         </div>
       </div>
     {/if}
+  </div>
   </div>
   {#if hoveredDate}
     <DayTooltip x={tooltipX} y={tooltipY} date={hoveredDate} {latitude} {longitude} {timezone} />

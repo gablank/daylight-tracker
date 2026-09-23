@@ -41,6 +41,23 @@
     }
   }
 
+  // Event kinds the list can be narrowed to
+  const FILTERS = [
+    { id: 'all', label: 'All', types: null },
+    { id: 'seasons', label: 'Seasons', types: ['astronomical'] },
+    { id: 'daylight', label: 'Day length', types: ['daylight'] },
+    { id: 'sun', label: 'Sunrise & sunset', types: ['sunrise', 'sunset'] },
+    { id: 'clock', label: 'Clock changes', types: ['dst'] }
+  ];
+  let filter = $state('all');
+
+  const relative = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
+  function daysFromSelected(date) {
+    const a = Date.UTC(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate());
+    const b = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+    return relative.format(Math.round((b - a) / 86400000), 'day');
+  }
+
   let hoveredGroup = $state(null);
   let tooltipX = $state(0);
   let tooltipY = $state(0);
@@ -219,8 +236,9 @@
       return a.priority - b.priority;
     });
     
-    // Return first 25 events
-    return events.slice(0, 25);
+    // First 25 events of the chosen kind
+    const kinds = FILTERS.find((k) => k.id === filter).types;
+    return events.filter((e) => !kinds || kinds.includes(e.type)).slice(0, 25);
   });
   
   // Group events by date for display
@@ -259,60 +277,76 @@
   });
 </script>
 
-<ChartCard id="upcoming" title="Noteworthy upcoming dates" subtitle="Solstices, clock changes and round-number sunrises, sunsets and day lengths.">
-  
+<!-- Small line icon per event kind (identity is also in the text, never colour alone) -->
+{#snippet icon(type)}
+  <svg class="h-4 w-4 shrink-0 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+    {#if type === 'astronomical'}
+      <circle cx="12" cy="12" r="4" /><path d="M12 2v2m0 16v2M2 12h2m16 0h2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+    {:else if type === 'sunrise'}
+      <path d="M12 14V5m-4 4 4-4 4 4M3 19h18" />
+    {:else if type === 'sunset'}
+      <path d="M12 5v9m-4-4 4 4 4-4M3 19h18" />
+    {:else if type === 'dst'}
+      <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" />
+    {:else}
+      <path d="M4 12h16M4 8v8m16-8v8" />
+    {/if}
+  </svg>
+{/snippet}
+
+<ChartCard id="upcoming" title="Noteworthy upcoming dates" subtitle="Solstices, clock changes and round-number sunrises, sunsets and day lengths. Click a date to select it.">
+  <div class="mb-4 flex flex-wrap gap-1.5" role="group" aria-label="Show">
+    {#each FILTERS as f}
+      <button
+        type="button"
+        class="rounded-full px-2.5 py-1 text-xs font-medium ring-1 transition-colors
+               {filter === f.id
+                 ? 'bg-gray-900 text-white ring-gray-900 dark:bg-white dark:text-gray-900 dark:ring-white'
+                 : 'text-gray-600 ring-gray-300 hover:bg-gray-100 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-700'}"
+        aria-pressed={filter === f.id}
+        onclick={() => filter = f.id}
+      >{f.label}</button>
+    {/each}
+  </div>
+
   {#if groupedEvents.length > 0}
-    <div class="overflow-x-auto">
-      <table class="w-full text-sm">
-        <thead>
-          <tr class="border-b border-gray-200 dark:border-gray-700">
-            <th class="text-left py-2 pr-4 font-medium text-gray-600 dark:text-gray-400 w-20">Date</th>
-            <th class="text-left py-2 font-medium text-gray-600 dark:text-gray-400">Event</th>
-          </tr>
-        </thead>
-        <tbody>
-          {#each groupedEvents as group, groupIdx}
-            {#each group.events as event, eventIdx}
-              <tr
-                class="{groupIdx > 0 && eventIdx === 0 ? 'border-t border-gray-300 dark:border-gray-600' : ''}"
-                onmouseenter={() => setHoveredGroup(group)}
-                onmousemove={(e) => { tooltipX = e.clientX; tooltipY = e.clientY; }}
-                onmouseleave={() => setHoveredGroup(null)}
-              >
-                <td class="py-1.5 pr-4 text-gray-900 dark:text-gray-100 whitespace-nowrap align-top">
-                  {#if eventIdx === 0}
-                    <button
-                      type="button"
-                      class="font-medium text-left cursor-pointer hover:underline focus:outline-none focus:ring-2 focus:ring-orange-400 rounded px-0.5 -mx-0.5"
-                      onclick={() => { setHoveredGroup(null); onDateSelect?.(group.date); }}
-                    >
-                      {formatDateShort(group.date)}
-                    </button>
-                  {/if}
-                </td>
-                <td class="py-1.5 text-gray-600 dark:text-gray-400">
-                  {#if event.type === 'astronomical'}
-                    <span class="font-medium text-amber-600 dark:text-amber-400">{event.description}</span>
-                  {:else if event.type === 'dst'}
-                    <span class="font-medium text-green-600 dark:text-green-400">{event.description}</span>
-                  {:else if event.type === 'sunrise'}
-                    <span class="text-orange-600 dark:text-orange-400">{event.description}</span>
-                  {:else if event.type === 'sunset'}
-                    <span class="text-purple-600 dark:text-purple-400">{event.description}</span>
-                  {:else}
-                    <span class="text-blue-600 dark:text-blue-400">{event.description}</span>
-                  {/if}
-                </td>
-              </tr>
+    <ol class="relative">
+      {#each groupedEvents as group, i}
+        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+        <li
+          class="relative grid grid-cols-[5.5rem_1fr] gap-x-4 pb-4 last:pb-0"
+          onmouseenter={() => setHoveredGroup(group)}
+          onmousemove={(e) => { tooltipX = e.clientX; tooltipY = e.clientY; }}
+          onmouseleave={() => setHoveredGroup(null)}
+        >
+          <!-- Rail and dot -->
+          {#if i < groupedEvents.length - 1}
+            <span class="absolute left-[5.5rem] top-3 bottom-0 ml-[1.3rem] w-px bg-gray-200 dark:bg-gray-700" aria-hidden="true"></span>
+          {/if}
+          <div class="text-right">
+            <button
+              type="button"
+              class="rounded px-0.5 text-sm font-semibold tabular-nums text-gray-900 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-gray-100"
+              onclick={() => { setHoveredGroup(null); onDateSelect?.(group.date); }}
+            >{formatDateShort(group.date)}</button>
+            <p class="text-[11px] text-gray-400 dark:text-gray-500">{daysFromSelected(group.date)}</p>
+          </div>
+          <ul class="relative space-y-1 pl-6">
+            <span class="absolute left-0 top-1.5 h-2.5 w-2.5 rounded-full bg-white ring-2 ring-gray-400 dark:bg-gray-800 dark:ring-gray-500" aria-hidden="true"></span>
+            {#each group.events as event}
+              <li class="flex items-center gap-2 text-sm {event.type === 'astronomical' || event.type === 'dst' ? 'font-medium text-gray-900 dark:text-gray-100' : 'text-gray-700 dark:text-gray-300'}">
+                {@render icon(event.type)}
+                {event.description}
+              </li>
             {/each}
-          {/each}
-        </tbody>
-      </table>
-    </div>
+          </ul>
+        </li>
+      {/each}
+    </ol>
   {:else}
-    <p class="text-gray-500 dark:text-gray-400 text-sm">Loading upcoming dates...</p>
+    <p class="text-sm text-gray-500 dark:text-gray-400">Nothing of this kind in the coming months.</p>
   {/if}
-  <div class="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700 text-xs text-gray-600 dark:text-gray-400">
+  <div class="mt-5 border-t border-gray-200 pt-3 text-xs text-gray-600 dark:border-gray-700 dark:text-gray-400">
     {#if calendarPreset}
       <p class="mb-1.5">
         Subscribe to a calendar for {calendarPreset.name}: daily sunrise/sunset plus these dates, updated weekly.

@@ -613,7 +613,7 @@
         </Chapter>
 
         <Chapter id="elsewhere" title="Elsewhere" description="Day and night around the world, and how another place compares.">
-          <div class="space-y-6">
+          <div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
             {@render sectionMap()}
             {@render sectionCompare()}
           </div>

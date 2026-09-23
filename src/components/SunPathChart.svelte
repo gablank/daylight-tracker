@@ -165,7 +165,7 @@
       {#each references as ref}
         <path d={ref.d} fill="none" stroke="var(--color-ink-muted)" stroke-opacity="0.7" stroke-width="1.25" stroke-dasharray="4 3" />
         {#if ref.top}
-          <text x={ref.top.x} y={ref.top.y + 13} text-anchor="middle" class="fill-gray-500 text-[9px] dark:fill-gray-400">{ref.label} {ref.date.getDate()}</text>
+          <text x={ref.top.x} y={ref.top.y - 5} text-anchor="middle" class="fill-gray-500 text-[9px] dark:fill-gray-400">{ref.label} {ref.date.getDate()}</text>
         {/if}
       {/each}
 
