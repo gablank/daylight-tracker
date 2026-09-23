@@ -1,7 +1,7 @@
 <script>
   import { setContext } from 'svelte';
   import { computeYearData, getSunData, findOppositeDate, formatDateShort, formatDuration, findUpcomingSunriseMilestones, findUpcomingSunsetMilestones, findUpcomingDSTChanges, findUpcomingDaylightMilestones } from './lib/solar.js';
-  import { getToday, getLocalTimezone, formatTimeInTimezone, formatDateISO, parseDateISO } from './lib/utils.js';
+  import { getToday, getLocalTimezone, formatTimeInTimezone, formatDateISO, parseDateISO, isValidTimezone } from './lib/utils.js';
   
   import LatitudeSelector from './components/LatitudeSelector.svelte';
   import DatePicker from './components/DatePicker.svelte';
@@ -21,6 +21,8 @@
   const initParams = new URLSearchParams(window.location.search);
   const urlHasState = initParams.has('lat') || initParams.has('lon') || initParams.has('tz') || initParams.has('date');
   let soloSection = $state(initParams.get('view'));
+  // A shared link shows someone else's settings — don't let it overwrite the visitor's saved ones
+  const openedFromSharedLink = urlHasState || !!soloSection;
   
   // State - Default to Oslo
   let latitude = $state(59.9);
@@ -41,16 +43,33 @@
   // Load settings: URL params (highest priority) > localStorage > geolocation > defaults
   $effect(() => {
     if (settingsLoaded) return;
-    
-    if (urlHasState || soloSection) {
-      // URL params override everything (shared link) — collapse settings by default
+
+    // Stored settings are the base; URL params (if any) override individual values below
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      try {
+        const settings = JSON.parse(stored);
+        if (settings.latitude !== undefined) latitude = settings.latitude;
+        if (settings.longitude !== undefined) longitude = settings.longitude;
+        if (isValidTimezone(settings.timezone)) timezone = settings.timezone;
+        if (settings.derivativeCount !== undefined) derivativeCount = Math.max(1, Math.min(5, settings.derivativeCount));
+        if (settings.settingsExpanded !== undefined) settingsExpanded = settings.settingsExpanded;
+        if (settings.mapExpanded !== undefined) mapExpanded = settings.mapExpanded;
+        // Note: selectedDate is NOT restored - always use current date on page load
+      } catch {
+        // Invalid stored settings, will use defaults
+      }
+    }
+
+    if (openedFromSharedLink) {
+      // Shared link: its params override stored settings — collapse settings by default
       const lat = parseFloat(initParams.get('lat'));
       const lon = parseFloat(initParams.get('lon'));
       const tz = initParams.get('tz');
       const dateStr = initParams.get('date');
-      if (!isNaN(lat)) latitude = lat;
-      if (!isNaN(lon)) longitude = lon;
-      if (tz) timezone = tz;
+      if (!isNaN(lat) && lat >= -90 && lat <= 90) latitude = lat;
+      if (!isNaN(lon) && lon >= -180 && lon <= 180) longitude = lon;
+      if (isValidTimezone(tz)) timezone = tz;
       if (dateStr) {
         const d = parseDateISO(dateStr);
         if (d && !isNaN(d.getTime())) selectedDate = d;
@@ -58,25 +77,9 @@
       settingsExpanded = false;
       settingsLoaded = true;
     } else {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        try {
-          const settings = JSON.parse(stored);
-          if (settings.latitude !== undefined) latitude = settings.latitude;
-          if (settings.longitude !== undefined) longitude = settings.longitude;
-          if (settings.timezone) timezone = settings.timezone;
-          if (settings.derivativeCount !== undefined) derivativeCount = Math.max(1, Math.min(5, settings.derivativeCount));
-          if (settings.settingsExpanded !== undefined) settingsExpanded = settings.settingsExpanded;
-          if (settings.mapExpanded !== undefined) mapExpanded = settings.mapExpanded;
-          // Note: selectedDate is NOT restored - always use current date on page load
-          settingsLoaded = true;
-        } catch {
-          // Invalid stored settings, will use defaults
-          settingsLoaded = true;
-        }
-      } else {
+      settingsLoaded = true;
+      if (!stored) {
         // No stored settings - try geolocation
-        settingsLoaded = true;
         if (navigator.geolocation) {
           navigator.geolocation.getCurrentPosition(
             (position) => {
@@ -96,7 +99,7 @@
   
   // Save settings when they change (excluding selectedDate)
   $effect(() => {
-    if (!settingsLoaded) return;
+    if (!settingsLoaded || openedFromSharedLink) return;
     
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
       latitude,
@@ -232,7 +235,9 @@
     // Skip if user is typing in an input, textarea, select, or contenteditable
     const tag = document.activeElement?.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || document.activeElement?.isContentEditable) return;
-    
+    // Leave browser/OS shortcuts alone (e.g. Alt+Left = back); Shift is ours (bigger steps)
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
+
     if (e.key === 'ArrowRight') {
       e.preventDefault();
       if (e.shiftKey) {

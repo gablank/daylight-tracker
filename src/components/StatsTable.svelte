@@ -127,7 +127,7 @@
             {mirrorDateInfo.date}
           </button>
           has the same amount of daylight ({mirrorDateInfo.daylight}) as the selected date, 
-          but on the opposite side of the winter solstice.
+          but on the opposite side of the nearest solstice.
         </p>
       </div>
     </div>

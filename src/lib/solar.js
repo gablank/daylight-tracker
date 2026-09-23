@@ -20,10 +20,10 @@ export function getDaysInYear(year) {
  * Get the day of year (0-indexed) for a date
  */
 export function getDayOfYear(date) {
-  const start = new Date(date.getFullYear(), 0, 0);
-  const diff = date.getTime() - start.getTime();
-  const oneDay = 1000 * 60 * 60 * 24;
-  return Math.floor(diff / oneDay);
+  // Compare calendar days in UTC so DST shifts in the local timezone don't skew the count
+  const day = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+  const start = Date.UTC(date.getFullYear(), 0, 0);
+  return Math.round((day - start) / (1000 * 60 * 60 * 24));
 }
 
 /**
@@ -799,10 +799,10 @@ export function findUpcomingDaylightMilestones(currentDate, yearData, latitude, 
   // At the poles, when one extreme ends, the opposite begins - ensure both are shown
   const addMissingExtremeEvent = (existingType, missingType, missingDesc) => {
     const hasExisting = milestones.some(m => m.description.toLowerCase().includes(existingType));
-    const hasMissing = milestones.some(m => m.description.toLowerCase().includes(missingType));
-    
+    const hasMissing = milestones.some(m => m.description === missingDesc);
+
     if (hasExisting && !hasMissing) {
-      const event = extremeEvents.find(e => e.type === missingType.replace(' ', '_'));
+      const event = extremeEvents.find(e => e.type === missingType);
       if (event) {
         const date = new Date(currentDate);
         date.setDate(date.getDate() + event.offset);

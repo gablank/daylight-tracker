@@ -289,6 +289,21 @@ export function getLocalTimezone() {
 }
 
 /**
+ * Check whether a string is a timezone name the browser's Intl API accepts
+ * @param {string} timezone
+ * @returns {boolean}
+ */
+export function isValidTimezone(timezone) {
+  if (typeof timezone !== 'string' || !timezone) return false;
+  try {
+    new Intl.DateTimeFormat('en-GB', { timeZone: timezone });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Get calendar day (year, month, day) of a date in a specific timezone
  * @param {Date} date
  * @param {string} timezone - IANA timezone name

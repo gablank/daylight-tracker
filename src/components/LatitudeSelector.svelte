@@ -93,6 +93,11 @@
       (p.latitudeOnly || Math.abs((p.longitude ?? 0) - longitude) < 0.1)
     )?.name || ''
   );
+
+  // Presets, geolocation and shared links can set timezones outside the curated list
+  let isListedTimezone = $derived(
+    TIMEZONE_GROUPS.some((g) => g.timezones.some((tz) => tz.name === timezone))
+  );
 </script>
 
 <div>
@@ -171,6 +176,9 @@
                bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100
                focus:outline-none focus:ring-2 focus:ring-blue-500"
       >
+        {#if !isListedTimezone}
+          <option value={timezone}>{timezone.replace(/_/g, ' ')}</option>
+        {/if}
         {#each TIMEZONE_GROUPS as group}
           <optgroup label={group.label}>
             {#each group.timezones as tz}
