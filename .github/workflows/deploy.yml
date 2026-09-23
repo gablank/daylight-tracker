@@ -3,6 +3,10 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [master]
+  # Weekly rebuild keeps the generated calendars (dist/calendars/*.ics) covering the next 13 months
+  schedule:
+    - cron: '17 3 * * 1'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -17,7 +21,7 @@ jobs:
       
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
       
       - run: npm ci

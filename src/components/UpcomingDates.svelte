@@ -11,7 +11,35 @@
     findSunTimeExtremes
   } from '../lib/solar.js';
   
+  import { PRESET_LOCATIONS, calendarSlug } from '../lib/utils.js';
+
   let { selectedDate, yearData, latitude, longitude, timezone, onDateSelect = null, onHoverDate = null } = $props();
+
+  // Subscribable calendar (generated at build time for each preset location)
+  let calendarPreset = $derived(
+    PRESET_LOCATIONS.find((p) =>
+      Math.abs(p.latitude - latitude) < 0.1 && Math.abs(p.longitude - longitude) < 0.1 && p.timezone === timezone
+    ) ?? null
+  );
+  let calendarUrl = $derived(
+    calendarPreset
+      ? new URL(`calendars/${calendarSlug(calendarPreset.name)}.ics`, window.location.origin + import.meta.env.BASE_URL).href
+      : null
+  );
+  let googleCalendarUrl = $derived(
+    calendarUrl ? `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(calendarUrl.replace(/^https?:/, 'webcal:'))}` : null
+  );
+  let calendarUrlCopied = $state(false);
+
+  async function copyCalendarUrl() {
+    try {
+      await navigator.clipboard.writeText(calendarUrl);
+      calendarUrlCopied = true;
+      setTimeout(() => { calendarUrlCopied = false; }, 1500);
+    } catch {
+      // clipboard may be blocked in some contexts
+    }
+  }
 
   let hoveredGroup = $state(null);
   let tooltipX = $state(0);
@@ -288,6 +316,32 @@
   {:else}
     <p class="text-gray-500 dark:text-gray-400 text-sm">Loading upcoming dates...</p>
   {/if}
+  <div class="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700 text-xs text-gray-600 dark:text-gray-400">
+    {#if calendarPreset}
+      <p class="mb-1.5">
+        Subscribe to a calendar for {calendarPreset.name}: daily sunrise/sunset plus these dates, updated weekly.
+      </p>
+      <div class="flex flex-wrap gap-2">
+        <a
+          href={googleCalendarUrl}
+          target="_blank"
+          rel="noopener"
+          class="px-2 py-1 rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 text-blue-600 dark:text-blue-400"
+        >
+          Add to Google Calendar
+        </a>
+        <button
+          type="button"
+          onclick={copyCalendarUrl}
+          class="px-2 py-1 rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700"
+        >
+          {calendarUrlCopied ? 'Copied!' : 'Copy calendar URL (other apps)'}
+        </button>
+      </div>
+    {:else}
+      <p>Subscribable calendars are available for the preset locations (choose one in Settings).</p>
+    {/if}
+  </div>
   {#if hoveredGroup}
     {@const stats = getDayStatsForTooltip(hoveredGroup.date, latitude, longitude, timezone)}
     <div

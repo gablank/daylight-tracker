@@ -156,6 +156,22 @@ export const PRESET_LOCATION_GROUPS = [
 export const PRESET_LOCATIONS = PRESET_LOCATION_GROUPS.flatMap((g) => g.locations);
 
 /**
+ * File name (without extension) of a preset location's generated calendar,
+ * e.g. "Tromsø, Norway" → "tromso-norway"
+ * @param {string} name
+ * @returns {string}
+ */
+export function calendarSlug(name) {
+  return name
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '') // strip accents
+    .replace(/ø/gi, 'o')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+/**
  * Common timezones grouped by region
  */
 export const TIMEZONE_GROUPS = [
