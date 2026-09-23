@@ -1,7 +1,6 @@
 <script>
-  import SunCalc from 'suncalc';
   import { WORLD_LAND_PATHS } from '../lib/world-land.js';
-  import { dateAtLocalInTimezone } from '../lib/utils.js';
+  import { timeOnDay, getSubsolarPoint } from '../lib/solar.js';
 
   let {
     latitude = $bindable(0),
@@ -25,28 +24,10 @@
     if (!selectedDate) return '';
 
     // Reference time: displayHour in the selected timezone on the selected date
-    const hour = displayHour ?? 12;
-    let refTime;
-    if (timezone) {
-      const y = selectedDate.getFullYear();
-      const m = selectedDate.getMonth() + 1;
-      const d = selectedDate.getDate();
-      const midnight = dateAtLocalInTimezone(y, m, d, 0, 0, timezone);
-      refTime = new Date(midnight.getTime() + hour * 3600000);
-    } else {
-      const wholeH = Math.floor(hour);
-      const mins = Math.round((hour - wholeH) * 60);
-      refTime = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), wholeH, mins, 0);
-    }
-
-    // Subsolar longitude: the meridian where the sun is directly overhead right now
-    const utcHours = refTime.getUTCHours() + refTime.getUTCMinutes() / 60 + refTime.getUTCSeconds() / 3600;
-    const sunLon = (12 - utcHours) * 15; // degrees
-
-    // Solar declination: at the pole, sun altitude = declination exactly
-    // (sin(alt) = sin(dec)*sin(90°) = sin(dec) → alt = dec)
-    const sunAtPole = SunCalc.getPosition(refTime, 89.99, sunLon);
-    const declination = sunAtPole.altitude; // radians
+    const refTime = timeOnDay(selectedDate, displayHour ?? 12, timezone);
+    const sun = getSubsolarPoint(refTime);
+    const sunLon = sun.longitude;
+    const declination = sun.latitude * Math.PI / 180;
 
     // Build terminator: for each longitude, the terminator latitude is where sun altitude = 0
     // Formula: lat_t = atan(-cos(lon - sunLon) / tan(declination))

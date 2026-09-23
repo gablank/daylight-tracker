@@ -7,6 +7,35 @@ import { LRUCache, CACHE_MAX_LARGE, CACHE_MAX_SMALL } from './cache.js';
 SunCalc.addTime(-4, 'blueHourEnd', 'blueHourStart');
 
 /**
+ * The instant at a fractional hour of the selected calendar day, in the given
+ * timezone (or the browser's when timezone is null).
+ */
+export function timeOnDay(date, hour, timezone = null) {
+  if (timezone) {
+    const midnight = dateAtLocalInTimezone(date.getFullYear(), date.getMonth() + 1, date.getDate(), 0, 0, timezone);
+    return new Date(midnight.getTime() + hour * 3600000);
+  }
+  const wholeH = Math.floor(hour);
+  const mins = Math.round((hour - wholeH) * 60);
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), wholeH, mins, 0);
+}
+
+/**
+ * The point on Earth where the sun is directly overhead at the given instant.
+ * @returns {{ latitude: number, longitude: number }} degrees
+ */
+export function getSubsolarPoint(time) {
+  // Subsolar longitude: the meridian where the sun is directly overhead right now
+  const utcHours = time.getUTCHours() + time.getUTCMinutes() / 60 + time.getUTCSeconds() / 3600;
+  const longitude = (12 - utcHours) * 15;
+
+  // Solar declination: at the pole, sun altitude = declination exactly
+  // (sin(alt) = sin(dec)*sin(90°) = sin(dec) → alt = dec)
+  const declination = SunCalc.getPosition(time, 89.99, longitude).altitude;
+  return { latitude: declination * 180 / Math.PI, longitude };
+}
+
+/**
  * Check if a year is a leap year
  */
 export function isLeapYear(year) {

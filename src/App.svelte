@@ -11,6 +11,7 @@
   import SunAzimuthChart from './components/SunAzimuthChart.svelte';
   import TwilightChart from './components/TwilightChart.svelte';
   import WorldMap from './components/WorldMap.svelte';
+  import Globe from './components/Globe.svelte';
   import SectionLink from './components/SectionLink.svelte';
   import StatsTable from './components/StatsTable.svelte';
   import UpcomingDates from './components/UpcomingDates.svelte';
@@ -35,6 +36,7 @@
   let derivativeCount = $state(1);
   let settingsExpanded = $state(true);
   let mapExpanded = $state(true);
+  let mapView = $state('map'); // 'map' or 'globe'
   let compareName = $state(null); // preset name of the location to compare with
   let settingsLoaded = $state(false);
   
@@ -59,6 +61,7 @@
         if (settings.derivativeCount !== undefined) derivativeCount = Math.max(1, Math.min(5, settings.derivativeCount));
         if (settings.settingsExpanded !== undefined) settingsExpanded = settings.settingsExpanded;
         if (settings.mapExpanded !== undefined) mapExpanded = settings.mapExpanded;
+        if (settings.mapView === 'map' || settings.mapView === 'globe') mapView = settings.mapView;
         if (typeof settings.compareName === 'string') compareName = settings.compareName;
         // Note: selectedDate is NOT restored - always use current date on page load
       } catch {
@@ -113,6 +116,7 @@
       derivativeCount,
       settingsExpanded,
       mapExpanded,
+      mapView,
       compareName
     }));
   });
@@ -434,24 +438,42 @@
           <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">World map</h3>
           <SectionLink id="map" />
         </div>
-        <button
-          type="button"
-          class="p-1 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-          onclick={() => mapExpanded = !mapExpanded}
-          aria-expanded={mapExpanded}
-          aria-label={mapExpanded ? 'Collapse map' : 'Expand map'}
-        >
-          <svg
-            class="w-4 h-4 transition-transform {mapExpanded ? 'rotate-180' : ''}"
-            fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"
+        <div class="flex items-center gap-2">
+          <div class="flex rounded-md border border-gray-300 dark:border-gray-600 overflow-hidden text-xs" role="group" aria-label="Map view">
+            {#each [['map', 'Map'], ['globe', 'Globe']] as [value, label]}
+              <button
+                type="button"
+                class="px-2 py-0.5 transition-colors {mapView === value
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}"
+                aria-pressed={mapView === value}
+                onclick={() => { mapView = value; mapExpanded = true; }}
+              >{label}</button>
+            {/each}
+          </div>
+          <button
+            type="button"
+            class="p-1 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+            onclick={() => mapExpanded = !mapExpanded}
+            aria-expanded={mapExpanded}
+            aria-label={mapExpanded ? 'Collapse map' : 'Expand map'}
           >
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-          </svg>
-        </button>
+            <svg
+              class="w-4 h-4 transition-transform {mapExpanded ? 'rotate-180' : ''}"
+              fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+        </div>
       </div>
       {#if mapExpanded}
         <div class="px-4 pb-4">
-          <WorldMap bind:latitude bind:longitude selectedDate={globalHoveredDate ?? selectedDate} {timezone} displayHour={globalHoveredHour ?? sunAzimuthSelectedHour} />
+          {#if mapView === 'globe'}
+            <Globe bind:latitude bind:longitude selectedDate={globalHoveredDate ?? selectedDate} {timezone} displayHour={globalHoveredHour ?? sunAzimuthSelectedHour} />
+          {:else}
+            <WorldMap bind:latitude bind:longitude selectedDate={globalHoveredDate ?? selectedDate} {timezone} displayHour={globalHoveredHour ?? sunAzimuthSelectedHour} />
+          {/if}
         </div>
       {/if}
     </div>
