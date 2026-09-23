@@ -15,6 +15,7 @@
   import StatsTable from './components/StatsTable.svelte';
   import UpcomingDates from './components/UpcomingDates.svelte';
   import SolarNoonChart from './components/SolarNoonChart.svelte';
+  import MoonCard from './components/MoonCard.svelte';
   
   const STORAGE_KEY = 'daylight-tracker-settings';
   
@@ -581,6 +582,12 @@
     </div>
   {/snippet}
 
+  {#snippet sectionMoon()}
+    <div id="moon">
+      <MoonCard {selectedDate} {latitude} {longitude} {timezone} onDateSelect={(date) => selectedDate = date} />
+    </div>
+  {/snippet}
+
   <div class="max-w-7xl mx-auto px-4 py-8">
     {#if soloSection}
       <div class="mb-4">
@@ -615,6 +622,8 @@
         {@render sectionUpcoming()}
       {:else if soloSection === 'solar-noon'}
         {@render sectionSolarNoon()}
+      {:else if soloSection === 'moon'}
+        {@render sectionMoon()}
       {/if}
     {:else}
       <!-- Full layout -->
@@ -634,6 +643,7 @@
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         {@render sectionSolarNoon()}
+        {@render sectionMoon()}
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
