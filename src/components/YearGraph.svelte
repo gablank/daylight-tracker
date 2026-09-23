@@ -1,7 +1,8 @@
 <script>
-  import { getDateAngle, formatDateShort, formatDuration, getDaysInYear, getWinterSolstice, getSummerSolstice, getMarchEquinox, getSeptemberEquinox, getDayOfYear, getSeasonName, getDayStatsForTooltip } from '../lib/solar.js';
+  import { getDateAngle, formatDateShort, formatDuration, getDaysInYear, getWinterSolstice, getSummerSolstice, getMarchEquinox, getSeptemberEquinox, getDayOfYear, getSeasonName } from '../lib/solar.js';
   import { calendarDateInTimezone } from '../lib/utils.js';
-  import SectionLink from './SectionLink.svelte';
+  import ChartCard from './ChartCard.svelte';
+  import DayTooltip from './DayTooltip.svelte';
   
   let { selectedDate, yearData, oppositeDate, latitude = 0, longitude = 0, timezone = null, hoveredDate = null, onHoverDate = null, onDateSelect = null } = $props();
   
@@ -63,8 +64,8 @@
     isHovering = false;
   }
   
-  // Load from localStorage, default to clockwise (true)
-  let isClockwise = $state(true);
+  // Load from localStorage; default counter-clockwise (winter solstice on top, the year runs left)
+  let isClockwise = $state(false);
   
   // Initialize from localStorage on mount
   $effect(() => {
@@ -270,25 +271,19 @@
   });
 </script>
 
-<div class="h-full bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm flex flex-col">
-  <div class="flex items-center justify-between mb-3">
-    <div class="flex items-center gap-0.5">
-      <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">Year overview</h3>
-      <SectionLink id="year-overview" />
-    </div>
-    
-    <!-- Direction toggle -->
-    <label class="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400 cursor-pointer">
-      <input 
-        type="checkbox" 
+<ChartCard id="year-overview" title="Year overview" subtitle="The year as a wheel, starting at the winter solstice. Brighter means longer days." class="h-full">
+  {#snippet actions()}
+    <label class="flex cursor-pointer items-center gap-2">
+      <input
+        type="checkbox"
         checked={isClockwise}
         onchange={handleClockwiseChange}
-        class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+        class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
       />
       <span>Clockwise</span>
     </label>
-  </div>
-  
+  {/snippet}
+
   <div class="flex flex-1 min-h-0 min-w-0 w-full overflow-hidden">
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
@@ -498,20 +493,10 @@
   
   <!-- Hover tooltip: day stats (only show when hovering directly on this component) -->
   {#if hoveredDate && isHovering}
-    {@const stats = getDayStatsForTooltip(hoveredDate, latitude, longitude, timezone)}
-    <div
-      class="fixed z-50 px-2 py-1.5 text-xs rounded shadow-lg bg-gray-800 text-gray-100 dark:bg-gray-700 dark:text-gray-200 pointer-events-none"
-      style="left: {tooltipX + 12}px; top: {tooltipY + 8}px;"
-    >
-      <div class="font-medium">{stats.dateLabel}</div>
-      <div>Sunrise: {stats.sunrise}</div>
-      <div>Sunset: {stats.sunset}</div>
-      <div>Daylight: {stats.daylight}</div>
-    </div>
+    <DayTooltip x={tooltipX} y={tooltipY} date={hoveredDate} {latitude} {longitude} {timezone} />
   {/if}
-  
-  <!-- Legend -->
-  <div class="mt-4 flex flex-wrap justify-center gap-4 text-xs">
+
+  {#snippet legend()}
     <div class="flex items-center gap-2">
       <div class="w-4 h-4 rounded-full bg-orange-600 dark:bg-orange-500 border-2 border-white shadow-sm"></div>
       <span class="text-gray-600 dark:text-gray-400">Selected date</span>
@@ -528,5 +513,5 @@
       <div class="w-3 h-3 bg-emerald-500 rotate-45 rounded-sm"></div>
       <span class="text-gray-600 dark:text-gray-400">Equinox</span>
     </div>
-  </div>
-</div>
+  {/snippet}
+</ChartCard>

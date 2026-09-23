@@ -2,6 +2,7 @@
   import SunCalc from 'suncalc';
   import { getDayOfYear, getDaysInYear, getDayStatsForTooltip, cachedSunCalcTimes } from '../lib/solar.js';
   import { dateAtLocalInTimezone } from '../lib/utils.js';
+  import ChartTooltip from './ChartTooltip.svelte';
 
   let { yearData, selectedDate, oppositeDate = null, latitude = 0, longitude = 0, timezone = null, hoveredDate = null, onHoverDate = null, onDateSelect = null, derivativeCount = 1 } = $props();
 
@@ -422,7 +423,7 @@
         y1={padding.top}
         x2={oppositeDateX}
         y2={padding.top + chartHeight}
-        stroke="rgb(16, 185, 129)"
+        stroke="var(--color-ink)"
         stroke-width="1.5"
         stroke-opacity="0.7"
         stroke-dasharray="4 3"
@@ -436,7 +437,7 @@
         y1={padding.top}
         x2={hoveredDateX}
         y2={padding.top + chartHeight}
-        stroke="white"
+        stroke="var(--color-ink-muted)"
         stroke-width="1.5"
         stroke-opacity="0.6"
       />
@@ -449,7 +450,7 @@
         y1={padding.top}
         x2={selectedDateX}
         y2={padding.top + chartHeight}
-        stroke="rgb(234, 88, 12)"
+        stroke="var(--color-ink)"
         stroke-width="2"
         stroke-opacity="0.9"
       />
@@ -484,21 +485,16 @@
   <!-- Tooltip -->
   {#if hoveredDate && isHovering}
     {@const stats = getDayStatsForTooltip(hoveredDate, latitude, longitude, timezone)}
-    <div
-      class="fixed z-50 px-2 py-1.5 text-xs rounded shadow-lg bg-gray-800 text-gray-100 dark:bg-gray-700 dark:text-gray-200 pointer-events-none"
-      style="left: {tooltipX + 12}px; top: {tooltipY + 8}px;"
-    >
-      <div class="font-medium">{stats.dateLabel}</div>
-      <div>Sunrise: {stats.sunrise} · Sunset: {stats.sunset}</div>
-      {#if hoveredTwilightStats}
-        <div class="mt-1 space-y-px">
-          <div><span class="inline-block w-2 h-2 rounded-sm mr-1" style="background: {colors.daylight}"></span>Daylight: {hoveredTwilightStats.daylight}</div>
-          <div><span class="inline-block w-2 h-2 rounded-sm mr-1" style="background: {colors.civil}"></span>Civil: {hoveredTwilightStats.civil}</div>
-          <div><span class="inline-block w-2 h-2 rounded-sm mr-1" style="background: {colors.nautical}"></span>Nautical: {hoveredTwilightStats.nautical}</div>
-          <div><span class="inline-block w-2 h-2 rounded-sm mr-1" style="background: {colors.astronomical}"></span>Astronomical: {hoveredTwilightStats.astronomical}</div>
-          <div><span class="inline-block w-2 h-2 rounded-sm mr-1" style="background: {colors.night}; border: 1px solid rgb(100,116,139);"></span>Night: {hoveredTwilightStats.night}</div>
-        </div>
-      {/if}
-    </div>
+    <ChartTooltip x={tooltipX} y={tooltipY} title={stats.dateLabel} rows={[
+      { label: 'Sunrise', value: stats.sunrise },
+      { label: 'Sunset', value: stats.sunset },
+      ...(hoveredTwilightStats ? [
+        { label: 'Daylight', value: hoveredTwilightStats.daylight, swatch: colors.daylight },
+        { label: 'Civil', value: hoveredTwilightStats.civil, swatch: colors.civil },
+        { label: 'Nautical', value: hoveredTwilightStats.nautical, swatch: colors.nautical },
+        { label: 'Astronomical', value: hoveredTwilightStats.astronomical, swatch: colors.astronomical },
+        { label: 'Night', value: hoveredTwilightStats.night, swatch: colors.night }
+      ] : [])
+    ]} />
   {/if}
 </div>

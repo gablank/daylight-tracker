@@ -1,7 +1,8 @@
 <script>
-  import { formatDuration, formatDateShort, getSunData, findDateWithGain, getDayOfYear, getDayStatsForTooltip, getSolsticeProgress, getTwilightInfo } from '../lib/solar.js';
+  import { formatDuration, formatDateShort, getSunData, findDateWithGain, getDayOfYear, getSolsticeProgress, getTwilightInfo } from '../lib/solar.js';
   import { addDays, formatDurationChange, formatTimeInTimezone } from '../lib/utils.js';
-  import SectionLink from './SectionLink.svelte';
+  import ChartCard from './ChartCard.svelte';
+  import DayTooltip from './DayTooltip.svelte';
   
   let { selectedDate, yearData, latitude, oppositeDate, longitude = 0, timezone = null, onDateSelect = null, onHoverDate = null } = $props();
 
@@ -119,11 +120,7 @@
   });
 </script>
 
-<div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
-  <div class="flex items-center gap-0.5 mb-4">
-    <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">Daylight statistics</h3>
-    <SectionLink id="stats" />
-  </div>
+<ChartCard id="stats" title="Daylight statistics" subtitle="How daylight will change over the coming weeks, and when it reaches each amount.">
   
   <!-- Mirror Date section (full width) -->
   {#if mirrorDateInfo}
@@ -324,15 +321,6 @@
     {/if}
   </div>
   {#if hoveredDate}
-    {@const stats = getDayStatsForTooltip(hoveredDate, latitude, longitude, timezone)}
-    <div
-      class="fixed z-50 px-2 py-1.5 text-xs rounded shadow-lg bg-gray-800 text-gray-100 dark:bg-gray-700 dark:text-gray-200 pointer-events-none"
-      style="left: {tooltipX + 12}px; top: {tooltipY + 8}px;"
-    >
-      <div class="font-medium">{stats.dateLabel}</div>
-      <div>Sunrise: {stats.sunrise}</div>
-      <div>Sunset: {stats.sunset}</div>
-      <div>Daylight: {stats.daylight}</div>
-    </div>
+    <DayTooltip x={tooltipX} y={tooltipY} date={hoveredDate} {latitude} {longitude} {timezone} />
   {/if}
-</div>
+</ChartCard>

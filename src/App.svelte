@@ -20,6 +20,8 @@
   import SolarNoonChart from './components/SolarNoonChart.svelte';
   import MoonCard from './components/MoonCard.svelte';
   import CompareCard from './components/CompareCard.svelte';
+  import ChartCard from './components/ChartCard.svelte';
+  import Chapter from './components/Chapter.svelte';
   
   const STORAGE_KEY = 'daylight-tracker-settings';
   
@@ -400,78 +402,61 @@
   </header>
 
   {#snippet sectionMap()}
-    <div id="map" class="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
-      <div class="flex items-center justify-between px-4 py-2.5">
-        <div class="flex items-center gap-0.5">
-          <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">World map</h3>
-          <SectionLink id="map" />
+    <ChartCard id="map" title="World map" subtitle="Where it's day and night at the selected time. Click to move there.">
+      {#snippet actions()}
+        <div class="flex overflow-hidden rounded-md border border-gray-300 dark:border-gray-600" role="group" aria-label="Map view">
+          {#each [['map', 'Map'], ['globe', 'Globe']] as [value, label]}
+            <button
+              type="button"
+              class="px-2.5 py-1 transition-colors {mapView === value
+                ? 'bg-blue-600 text-white'
+                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}"
+              aria-pressed={mapView === value}
+              onclick={() => { mapView = value; mapExpanded = true; }}
+            >{label}</button>
+          {/each}
         </div>
-        <div class="flex items-center gap-2">
-          <div class="flex rounded-md border border-gray-300 dark:border-gray-600 overflow-hidden text-xs" role="group" aria-label="Map view">
-            {#each [['map', 'Map'], ['globe', 'Globe']] as [value, label]}
-              <button
-                type="button"
-                class="px-2 py-0.5 transition-colors {mapView === value
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}"
-                aria-pressed={mapView === value}
-                onclick={() => { mapView = value; mapExpanded = true; }}
-              >{label}</button>
-            {/each}
-          </div>
-          <button
-            type="button"
-            class="p-1 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-            onclick={() => mapExpanded = !mapExpanded}
-            aria-expanded={mapExpanded}
-            aria-label={mapExpanded ? 'Collapse map' : 'Expand map'}
-          >
-            <svg
-              class="w-4 h-4 transition-transform {mapExpanded ? 'rotate-180' : ''}"
-              fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"
-            >
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-        </div>
-      </div>
+        <button
+          type="button"
+          class="rounded p-1 text-gray-500 transition-colors hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+          onclick={() => mapExpanded = !mapExpanded}
+          aria-expanded={mapExpanded}
+          aria-label={mapExpanded ? 'Collapse map' : 'Expand map'}
+        >
+          <svg class="h-4 w-4 transition-transform {mapExpanded ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+      {/snippet}
       {#if mapExpanded}
-        <div class="px-4 pb-4">
-          {#if mapView === 'globe'}
-            <Globe bind:latitude bind:longitude selectedDate={globalHoveredDate ?? selectedDate} {timezone} displayHour={globalHoveredHour ?? sunAzimuthSelectedHour} />
-          {:else}
-            <WorldMap bind:latitude bind:longitude selectedDate={globalHoveredDate ?? selectedDate} {timezone} displayHour={globalHoveredHour ?? sunAzimuthSelectedHour} />
-          {/if}
-        </div>
+        {#if mapView === 'globe'}
+          <Globe bind:latitude bind:longitude selectedDate={globalHoveredDate ?? selectedDate} {timezone} displayHour={globalHoveredHour ?? sunAzimuthSelectedHour} />
+        {:else}
+          <WorldMap bind:latitude bind:longitude selectedDate={globalHoveredDate ?? selectedDate} {timezone} displayHour={globalHoveredHour ?? sunAzimuthSelectedHour} />
+        {/if}
       {/if}
-    </div>
+    </ChartCard>
   {/snippet}
 
   {#snippet sectionYearOverview()}
-    <div id="year-overview">
-      <YearGraph 
-        {selectedDate} 
-        {yearData} 
-        {oppositeDate} 
-        {latitude} 
-        {longitude} 
-        {timezone} 
-        hoveredDate={globalHoveredDate}
-        onHoverDate={(date) => globalHoveredDate = date}
-        onDateSelect={(date) => selectedDate = date}
-      />
-    </div>
+    <YearGraph
+      {selectedDate}
+      {yearData}
+      {oppositeDate}
+      {latitude}
+      {longitude}
+      {timezone}
+      hoveredDate={globalHoveredDate}
+      onHoverDate={(date) => globalHoveredDate = date}
+      onDateSelect={(date) => selectedDate = date}
+    />
   {/snippet}
 
   {#snippet sectionDaylight()}
-    <div id="daylight" class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm flex flex-col h-full">
-      <div class="flex items-center justify-between mb-3">
-        <div class="flex items-center gap-0.5">
-          <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">Daylight throughout the year</h3>
-          <SectionLink id="daylight" />
-        </div>
-        <label class="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
-          <span>Derivatives:</span>
+    <ChartCard id="daylight" title="Daylight throughout the year" subtitle="Day length, and when the sun rises and sets through each stage of twilight." class="h-full">
+      {#snippet actions()}
+        <label class="flex items-center gap-2">
+          <span>Derivatives</span>
           <input
             type="number"
             min="1"
@@ -481,16 +466,16 @@
               const v = parseInt(e.currentTarget.value, 10);
               if (!isNaN(v)) derivativeCount = Math.max(1, Math.min(5, v));
             }}
-            class="w-14 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 py-1 text-gray-900 dark:text-gray-100 text-center focus:outline-none focus:ring-0"
+            class="w-14 rounded border border-gray-300 bg-white px-2 py-1 text-center text-gray-900 focus:outline-none focus:ring-0 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
           />
         </label>
-      </div>
-      <div class="flex-1 min-h-0 flex flex-col gap-2">
-        <div class="flex-1 min-h-0">
-          <DaylightChart 
+      {/snippet}
+      <div class="flex h-full min-h-0 flex-col gap-2">
+        <div class="min-h-0 flex-1">
+          <DaylightChart
             bind:derivativeCount
-            {yearData} 
-            {selectedDate} 
+            {yearData}
+            {selectedDate}
             {oppositeDate}
             {latitude}
             {longitude}
@@ -500,7 +485,7 @@
             onDateSelect={(date) => selectedDate = date}
           />
         </div>
-        <div class="flex-1 min-h-0">
+        <div class="min-h-0 flex-1">
           <TwilightChart
             {yearData}
             {selectedDate}
@@ -515,158 +500,137 @@
           />
         </div>
       </div>
-    </div>
+    </ChartCard>
   {/snippet}
 
   {#snippet sectionSunPosition()}
-    <div id="sun-position">
-      <SunAzimuthChart
-        {yearData}
-        {selectedDate}
-        {oppositeDate}
-        {latitude}
-        {longitude}
-        {timezone}
-        hoveredDate={globalHoveredDate}
-        onHoverDate={(date) => globalHoveredDate = date}
-        onDateSelect={(date) => selectedDate = date}
-        hoveredHour={globalHoveredHour}
-        onHoverHour={(h) => globalHoveredHour = h}
-        bind:selectedHour={sunAzimuthSelectedHour}
-      />
-    </div>
+    <SunAzimuthChart
+      {yearData}
+      {selectedDate}
+      {oppositeDate}
+      {latitude}
+      {longitude}
+      {timezone}
+      hoveredDate={globalHoveredDate}
+      onHoverDate={(date) => globalHoveredDate = date}
+      onDateSelect={(date) => selectedDate = date}
+      hoveredHour={globalHoveredHour}
+      onHoverHour={(h) => globalHoveredHour = h}
+      bind:selectedHour={sunAzimuthSelectedHour}
+    />
   {/snippet}
 
   {#snippet sectionSunPath()}
-    <div id="sun-path">
-      <SunPathChart
-        {selectedDate}
-        {latitude}
-        {longitude}
-        {timezone}
-        highlightHour={sunAzimuthSelectedHour}
-        onHoverHour={(h) => globalHoveredHour = h}
-      />
-    </div>
+    <SunPathChart
+      {selectedDate}
+      {latitude}
+      {longitude}
+      {timezone}
+      highlightHour={sunAzimuthSelectedHour}
+      onHoverHour={(h) => globalHoveredHour = h}
+    />
   {/snippet}
 
   {#snippet sectionStats()}
-    <div id="stats">
-      <StatsTable {selectedDate} {yearData} {latitude} {longitude} {oppositeDate} {timezone} onDateSelect={(date) => selectedDate = date} onHoverDate={(date) => globalHoveredDate = date} />
-    </div>
+    <StatsTable {selectedDate} {yearData} {latitude} {longitude} {oppositeDate} {timezone} onDateSelect={(date) => selectedDate = date} onHoverDate={(date) => globalHoveredDate = date} />
   {/snippet}
 
   {#snippet sectionUpcoming()}
-    <div id="upcoming">
-      <UpcomingDates {selectedDate} {yearData} {latitude} {longitude} {timezone} onDateSelect={(date) => selectedDate = date} onHoverDate={(date) => globalHoveredDate = date} />
-    </div>
+    <UpcomingDates {selectedDate} {yearData} {latitude} {longitude} {timezone} onDateSelect={(date) => selectedDate = date} onHoverDate={(date) => globalHoveredDate = date} />
   {/snippet}
 
   {#snippet sectionSolarNoon()}
-    <div id="solar-noon">
-      <SolarNoonChart
-        {selectedDate}
-        {latitude}
-        {longitude}
-        {timezone}
-        hoveredDate={globalHoveredDate}
-        onHoverDate={(date) => globalHoveredDate = date}
-        onDateSelect={(date) => selectedDate = date}
-      />
-    </div>
+    <SolarNoonChart
+      {selectedDate}
+      {latitude}
+      {longitude}
+      {timezone}
+      hoveredDate={globalHoveredDate}
+      onHoverDate={(date) => globalHoveredDate = date}
+      onDateSelect={(date) => selectedDate = date}
+    />
   {/snippet}
 
   {#snippet sectionMoon()}
-    <div id="moon">
-      <MoonCard {selectedDate} {latitude} {longitude} {timezone} displayHour={globalHoveredHour ?? sunAzimuthSelectedHour} onDateSelect={(date) => selectedDate = date} />
-    </div>
+    <MoonCard {selectedDate} {latitude} {longitude} {timezone} displayHour={globalHoveredHour ?? sunAzimuthSelectedHour} onDateSelect={(date) => selectedDate = date} />
   {/snippet}
 
   {#snippet sectionCompare()}
-    <div id="compare">
-      <CompareCard
-        {selectedDate}
-        {latitude}
-        {longitude}
-        {timezone}
-        bind:compareName
-        hoveredDate={globalHoveredDate}
-        onHoverDate={(date) => globalHoveredDate = date}
-        onDateSelect={(date) => selectedDate = date}
-      />
-    </div>
+    <CompareCard
+      {selectedDate}
+      {latitude}
+      {longitude}
+      {timezone}
+      bind:compareName
+      hoveredDate={globalHoveredDate}
+      onHoverDate={(date) => globalHoveredDate = date}
+      onDateSelect={(date) => selectedDate = date}
+    />
   {/snippet}
 
-  <div class="max-w-7xl mx-auto px-4 py-8">
+
+  <main class="max-w-7xl mx-auto px-4 py-8">
     {#if soloSection}
+      <!-- Solo mode: show only the selected section -->
+      {@const sections = {
+        map: sectionMap,
+        'year-overview': sectionYearOverview,
+        daylight: sectionDaylight,
+        'sun-position': sectionSunPosition,
+        'sun-path': sectionSunPath,
+        stats: sectionStats,
+        upcoming: sectionUpcoming,
+        'solar-noon': sectionSolarNoon,
+        moon: sectionMoon,
+        compare: sectionCompare
+      }}
       <div class="mb-4">
         <button
           type="button"
           class="inline-flex items-center gap-1.5 text-sm text-blue-600 dark:text-blue-400 hover:underline"
           onclick={showAllSections}
         >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
           </svg>
           Show all sections
         </button>
       </div>
-    {/if}
-
-    {#if soloSection}
-      <!-- Solo mode: show only the selected section -->
-      {#if soloSection === 'map'}
-        {@render sectionMap()}
-      {:else if soloSection === 'year-overview'}
-        {@render sectionYearOverview()}
-      {:else if soloSection === 'daylight'}
-        {@render sectionDaylight()}
-      {:else if soloSection === 'sun-position'}
-        {@render sectionSunPosition()}
-      {:else if soloSection === 'sun-path'}
-        {@render sectionSunPath()}
-      {:else if soloSection === 'stats'}
-        {@render sectionStats()}
-      {:else if soloSection === 'upcoming'}
-        {@render sectionUpcoming()}
-      {:else if soloSection === 'solar-noon'}
-        {@render sectionSolarNoon()}
-      {:else if soloSection === 'moon'}
-        {@render sectionMoon()}
-      {:else if soloSection === 'compare'}
-        {@render sectionCompare()}
-      {/if}
+      {@render sections[soloSection]?.()}
     {:else}
-      <!-- Full layout -->
-      <div class="mb-6">
-        {@render sectionMap()}
-      </div>
+      <div class="space-y-12">
+        <Chapter id="year" title="Through the year" description="How daylight grows and shrinks, day by day.">
+          <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            {@render sectionYearOverview()}
+            {@render sectionDaylight()}
+          </div>
+        </Chapter>
 
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        {@render sectionYearOverview()}
-        {@render sectionDaylight()}
-      </div>
-      
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        {@render sectionSunPosition()}
-        {@render sectionSunPath()}
-      </div>
+        <Chapter id="sky" title="The sky" description="Where the sun and moon are, and when.">
+          <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            {@render sectionSunPath()}
+            {@render sectionSunPosition()}
+            {@render sectionSolarNoon()}
+            {@render sectionMoon()}
+          </div>
+        </Chapter>
 
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        {@render sectionSolarNoon()}
-        {@render sectionMoon()}
-      </div>
+        <Chapter id="coming-up" title="Coming up" description="Milestones in the weeks and months ahead.">
+          <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            {@render sectionUpcoming()}
+            {@render sectionStats()}
+          </div>
+        </Chapter>
 
-      <div class="mb-6">
-        {@render sectionCompare()}
-      </div>
-
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {@render sectionStats()}
-        {@render sectionUpcoming()}
+        <Chapter id="elsewhere" title="Elsewhere" description="Day and night around the world, and how another place compares.">
+          <div class="space-y-6">
+            {@render sectionMap()}
+            {@render sectionCompare()}
+          </div>
+        </Chapter>
       </div>
     {/if}
-    
+
     <!-- Footer -->
     <footer class="mt-12 text-center text-sm text-gray-500 dark:text-gray-400">
       <p>
@@ -675,5 +639,5 @@
         <a href="THIRD-PARTY-LICENSES.md" class="text-blue-600 dark:text-blue-400 hover:underline" target="_blank" rel="noopener">Third-party licenses</a>.
       </p>
     </footer>
-  </div>
+  </main>
 </div>

@@ -2,7 +2,7 @@
   import { getMoonPhase, getMoonRiseSet, findNextMoonPhases, getMoonOrientation } from '../lib/moon.js';
   import { formatDateShort, timeOnDay } from '../lib/solar.js';
   import { dateAtLocalInTimezone, formatTimeInTimezone, calendarDateInTimezone } from '../lib/utils.js';
-  import SectionLink from './SectionLink.svelte';
+  import ChartCard from './ChartCard.svelte';
 
   let { selectedDate, latitude, longitude, timezone, displayHour = 12, onDateSelect = null } = $props();
 
@@ -32,11 +32,7 @@
   }
 </script>
 
-<div class="h-full bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm flex flex-col">
-  <div class="flex items-center gap-0.5 mb-3">
-    <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">Moon</h3>
-    <SectionLink id="moon" />
-  </div>
+<ChartCard id="moon" title="Moon" subtitle="Phase and rise/set times, drawn as it looks from here at the selected time." class="h-full">
 
   <div class="flex flex-wrap items-center gap-6">
     <!-- Phase -->
@@ -94,4 +90,4 @@
     </tbody>
   </table>
   <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-2">Phase times are approximate (within a few hours).</p>
-</div>
+</ChartCard>

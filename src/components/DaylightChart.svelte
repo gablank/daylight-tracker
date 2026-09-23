@@ -1,5 +1,6 @@
 <script>
-  import { getDayOfYear, getDaysInYear, getDayStatsForTooltip } from '../lib/solar.js';
+  import { getDayOfYear, getDaysInYear } from '../lib/solar.js';
+  import DayTooltip from './DayTooltip.svelte';
   import { formatDurationChangeMinutesSeconds } from '../lib/utils.js';
 
   let { yearData, selectedDate, oppositeDate = null, latitude = 0, longitude = 0, timezone = null, hoveredDate = null, onHoverDate = null, onDateSelect = null, derivativeCount = $bindable(1) } = $props();
@@ -219,8 +220,8 @@
   >
     <defs>
       <linearGradient id="daylightChartGradient" x1="0" x2="0" y1="0" y2="1">
-        <stop offset="0%" stop-color="rgb(59, 130, 246)" stop-opacity="0.4" />
-        <stop offset="100%" stop-color="rgb(59, 130, 246)" stop-opacity="0.05" />
+        <stop offset="0%" stop-color="var(--color-sun)" stop-opacity="0.4" />
+        <stop offset="100%" stop-color="var(--color-sun)" stop-opacity="0.05" />
       </linearGradient>
     </defs>
 
@@ -315,7 +316,7 @@
     <path
       d={pathData}
       fill="none"
-      stroke="rgb(59, 130, 246)"
+      stroke="var(--color-sun)"
       stroke-width="2"
       stroke-linecap="round"
       stroke-linejoin="round"
@@ -343,7 +344,7 @@
         y1={padding.top}
         x2={oppositeDateX}
         y2={padding.top + chartHeight}
-        stroke="rgb(16, 185, 129)"
+        stroke="var(--color-ink)"
         stroke-width="1.5"
         stroke-opacity="0.7"
         stroke-dasharray="4 3"
@@ -357,7 +358,7 @@
         y1={padding.top}
         x2={hoveredDateX}
         y2={padding.top + chartHeight}
-        stroke="rgb(59, 130, 246)"
+        stroke="var(--color-ink-muted)"
         stroke-width="2"
         stroke-opacity="0.6"
       />
@@ -370,7 +371,7 @@
         y1={padding.top}
         x2={selectedDateX}
         y2={padding.top + chartHeight}
-        stroke="rgb(234, 88, 12)"
+        stroke="var(--color-ink)"
         stroke-width="2"
         stroke-opacity="0.9"
       />
@@ -390,15 +391,6 @@
   </div>
   <!-- Hover tooltip: day stats (only show when hovering directly on this component) -->
   {#if hoveredDate && isHovering}
-    {@const stats = getDayStatsForTooltip(hoveredDate, latitude, longitude, timezone)}
-    <div
-      class="fixed z-50 px-2 py-1.5 text-xs rounded shadow-lg bg-gray-800 text-gray-100 dark:bg-gray-700 dark:text-gray-200 pointer-events-none"
-      style="left: {tooltipX + 12}px; top: {tooltipY + 8}px;"
-    >
-      <div class="font-medium">{stats.dateLabel}</div>
-      <div>Sunrise: {stats.sunrise}</div>
-      <div>Sunset: {stats.sunset}</div>
-      <div>Daylight: {stats.daylight}</div>
-    </div>
+    <DayTooltip x={tooltipX} y={tooltipY} date={hoveredDate} {latitude} {longitude} {timezone} />
   {/if}
 </div>

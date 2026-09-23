@@ -1,7 +1,8 @@
 <script>
   import { getSunPathForDay, getSunData, getSunPosition, getGoldenBlueHours } from '../lib/solar.js';
   import { formatTimeInTimezone, getHourInTimezone } from '../lib/utils.js';
-  import SectionLink from './SectionLink.svelte';
+  import ChartCard from './ChartCard.svelte';
+  import ChartTooltip from './ChartTooltip.svelte';
 
   let { selectedDate, latitude, longitude, timezone, highlightHour = null, onHoverHour = null } = $props();
 
@@ -273,11 +274,7 @@
   });
 </script>
 
-<div class="min-h-0 bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm flex flex-col">
-  <div class="flex items-center gap-0.5 mb-2 shrink-0">
-    <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">Sun path</h3>
-    <SectionLink id="sun-path" />
-  </div>
+<ChartCard id="sun-path" title="Sun path" subtitle="The sun's track across the sky on the selected date, seen from above and from the side.">
   <div class="flex flex-wrap items-start justify-center gap-4 min-h-0">
     <!-- Polar sun path -->
     <div class="flex flex-col shrink-0 w-full max-w-[280px] overflow-visible">
@@ -373,7 +370,7 @@
       <!-- Sunrise, noon, sunset markers -->
       {#each markers as m}
         {@const { x, y } = altAzToXY(m.alt, m.az)}
-        <circle cx={x} cy={y} r={4} fill="rgb(234, 88, 12)" stroke="white" stroke-width="1" />
+        <circle cx={x} cy={y} r={4} fill="var(--color-ink)" stroke="var(--color-halo)" stroke-width="1" />
         <text
           x={x}
           y={y - 8}
@@ -389,9 +386,9 @@
           cx={highlightPolarPos.x}
           cy={highlightPolarPos.y}
           r="5"
-          fill="rgb(59, 130, 246)"
+          fill="var(--color-ink-muted)"
           fill-opacity="0.8"
-          stroke="white"
+          stroke="var(--color-halo)"
           stroke-width="1"
         />
       {/if}
@@ -402,7 +399,7 @@
           cy={tooltipPolarPos.y}
           r="6"
           fill="none"
-          stroke="rgb(234, 88, 12)"
+          stroke="var(--color-ink)"
           stroke-width="2"
         />
       {/if}
@@ -449,7 +446,7 @@
             y1={altChartPadding.top}
             x2={highlightAltPos.x}
             y2={altChartPadding.top + altChartPlotHeight}
-            stroke="rgb(59, 130, 246)"
+            stroke="var(--color-ink-muted)"
             stroke-width="1"
             stroke-dasharray="2,2"
             stroke-opacity="0.6"
@@ -458,8 +455,8 @@
             cx={highlightAltPos.x}
             cy={highlightAltPos.y}
             r="4"
-            fill="rgb(59, 130, 246)"
-            stroke="white"
+            fill="var(--color-ink-muted)"
+            stroke="var(--color-halo)"
             stroke-width="1"
           />
         {/if}
@@ -470,7 +467,7 @@
             y1={altChartPadding.top}
             x2={tooltipAltPos.x}
             y2={altChartPadding.top + altChartPlotHeight}
-            stroke="rgb(234, 88, 12)"
+            stroke="var(--color-ink)"
             stroke-width="1"
             stroke-dasharray="2,2"
             stroke-opacity="0.8"
@@ -479,8 +476,8 @@
             cx={tooltipAltPos.x}
             cy={tooltipAltPos.y}
             r="5"
-            fill="rgb(234, 88, 12)"
-            stroke="white"
+            fill="var(--color-ink)"
+            stroke="var(--color-halo)"
             stroke-width="1"
           />
         {/if}
@@ -512,16 +509,10 @@
   <!-- Tooltip: Time, solar height, direction (diagram angle: 0°=N, 90°=E, 180°=S, 270°=W) -->
   {#if tooltip}
     {@const diagramAngle = azimuthToDiagramAngle(tooltip.azimuth)}
-    <div
-      class="fixed z-50 px-2 py-1.5 text-xs rounded shadow-lg bg-gray-800 text-gray-100 dark:bg-gray-700 dark:text-gray-200 pointer-events-none"
-      style="left: {tooltipX + 12}px; top: {tooltipY + 8}px;"
-    >
-      <div>Time: {formatTimeInTimezone(tooltip.time, timezone)}</div>
-      <div>Solar height: {tooltip.altitude.toFixed(1)}°</div>
-      <div>Direction: {formatDirection(diagramAngle)} ({Math.round(diagramAngle)}°)</div>
-      {#if tooltip.altitude > 0}
-        <div>Shadow: {describeShadow(tooltip.altitude, tooltip.azimuth)}</div>
-      {/if}
-    </div>
+    <ChartTooltip x={tooltipX} y={tooltipY} title={formatTimeInTimezone(tooltip.time, timezone)} rows={[
+      { label: 'Solar height', value: `${tooltip.altitude.toFixed(1)}°` },
+      { label: 'Direction', value: `${formatDirection(diagramAngle)} (${Math.round(diagramAngle)}°)` },
+      ...(tooltip.altitude > 0 ? [{ label: 'Shadow', value: describeShadow(tooltip.altitude, tooltip.azimuth) }] : [])
+    ]} />
   {/if}
-</div>
+</ChartCard>

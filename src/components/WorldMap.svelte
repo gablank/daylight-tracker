@@ -169,10 +169,10 @@
 
   <!-- Hover marker -->
   {#if hoverLat !== null && hoverLon !== null}
-    <circle cx={hoverLon} cy={-hoverLat} r="2" fill="rgb(59, 130, 246)" fill-opacity="0.8" stroke="white" stroke-width="0.5" />
+    <circle cx={hoverLon} cy={-hoverLat} r="2" fill="var(--color-ink-muted)" fill-opacity="0.8" stroke="var(--color-halo)" stroke-width="0.5" />
     <!-- Crosshair lines -->
-    <line x1={hoverLon} y1={-90} x2={hoverLon} y2={90} stroke="rgb(59, 130, 246)" stroke-opacity="0.3" stroke-width="0.3" />
-    <line x1={-180} y1={-hoverLat} x2={180} y2={-hoverLat} stroke="rgb(59, 130, 246)" stroke-opacity="0.3" stroke-width="0.3" />
+    <line x1={hoverLon} y1={-90} x2={hoverLon} y2={90} stroke="var(--color-ink-muted)" stroke-opacity="0.3" stroke-width="0.3" />
+    <line x1={-180} y1={-hoverLat} x2={180} y2={-hoverLat} stroke="var(--color-ink-muted)" stroke-opacity="0.3" stroke-width="0.3" />
     <!-- Coordinate label -->
     {@const labelX = hoverLon > 120 ? hoverLon - 5 : hoverLon + 5}
     {@const labelAnchor = hoverLon > 120 ? 'end' : 'start'}
@@ -189,8 +189,8 @@
   {/if}
 
   <!-- Selected position marker -->
-  <circle cx={longitude} cy={-latitude} r="2.5" fill="none" stroke="rgb(234, 88, 12)" stroke-width="0.8" />
-  <circle cx={longitude} cy={-latitude} r="0.8" fill="rgb(234, 88, 12)" />
+  <circle cx={longitude} cy={-latitude} r="2.5" fill="none" stroke="var(--color-ink)" stroke-width="0.8" />
+  <circle cx={longitude} cy={-latitude} r="0.8" fill="var(--color-ink)" />
 
   <!-- Time label -->
   <text

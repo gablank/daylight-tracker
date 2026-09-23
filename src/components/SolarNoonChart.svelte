@@ -1,7 +1,8 @@
 <script>
   import { computeSolarNoonYear, getDayOfYear, getDaysInYear, formatDateShort } from '../lib/solar.js';
   import { clockHoursInTimezone, formatTimeInTimezone, formatDurationChangeMinutesSeconds } from '../lib/utils.js';
-  import SectionLink from './SectionLink.svelte';
+  import ChartCard from './ChartCard.svelte';
+  import ChartTooltip from './ChartTooltip.svelte';
 
   let { selectedDate, latitude, longitude, timezone, hoveredDate = null, onHoverDate = null, onDateSelect = null } = $props();
 
@@ -127,22 +128,18 @@
   });
 </script>
 
-<div class="h-full bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm flex flex-col">
-  <div class="flex items-center justify-between mb-3 gap-2 flex-wrap">
-    <div class="flex items-center gap-0.5">
-      <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">Solar noon</h3>
-      <SectionLink id="solar-noon" />
-    </div>
+<ChartCard id="solar-noon" title="Solar noon" class="h-full">
+  {#snippet subtitle()}
     {#if selectedDay}
-      <p class="text-xs text-gray-600 dark:text-gray-400">
         {formatDateShort(selectedDate)}: solar noon at
         <span class="font-medium text-gray-900 dark:text-gray-100">{formatTimeInTimezone(selectedDay.solarNoon, timezone)}</span>,
         sun
         <span class="font-medium text-gray-900 dark:text-gray-100">{formatDurationChangeMinutesSeconds(Math.abs(selectedDay.equationOfTime) * 60000).slice(1)}</span>
         {selectedDay.equationOfTime >= 0 ? 'ahead of' : 'behind'} the clock average
-      </p>
+    {:else}
+      When the sun is highest, by the clock.
     {/if}
-  </div>
+  {/snippet}
 
   <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions a11y_no_noninteractive_element_interactions -->
   <svg
@@ -173,18 +170,17 @@
 
     <!-- Hovered date -->
     {#if hoveredIndex != null}
-      <line x1={xScale(hoveredIndex)} y1={padding.top} x2={xScale(hoveredIndex)} y2={padding.top + chartHeight} stroke="rgb(59, 130, 246)" stroke-width="2" stroke-opacity="0.6" />
+      <line x1={xScale(hoveredIndex)} y1={padding.top} x2={xScale(hoveredIndex)} y2={padding.top + chartHeight} stroke="var(--color-ink-muted)" stroke-width="2" stroke-opacity="0.6" />
     {/if}
 
     <!-- Selected date -->
     {#if selectedIndex != null}
-      <line x1={xScale(selectedIndex)} y1={padding.top} x2={xScale(selectedIndex)} y2={padding.top + chartHeight} stroke="rgb(234, 88, 12)" stroke-width="2" stroke-opacity="0.9" />
-      <circle cx={xScale(selectedIndex)} cy={yScale(noonData[selectedIndex].clockHours)} r="4" fill="rgb(234, 88, 12)" stroke="white" stroke-width="1" />
+      <line x1={xScale(selectedIndex)} y1={padding.top} x2={xScale(selectedIndex)} y2={padding.top + chartHeight} stroke="var(--color-ink)" stroke-width="2" stroke-opacity="0.9" />
+      <circle cx={xScale(selectedIndex)} cy={yScale(noonData[selectedIndex].clockHours)} r="4" fill="var(--color-ink)" stroke="var(--color-halo)" stroke-width="2" />
     {/if}
   </svg>
 
-  <!-- Legend -->
-  <div class="mt-2 flex flex-wrap justify-center gap-4 text-xs text-gray-600 dark:text-gray-400">
+  {#snippet legend()}
     <div class="flex items-center gap-2">
       <div class="w-4 h-0.5 bg-amber-500"></div>
       <span>Solar noon</span>
@@ -193,18 +189,14 @@
       <div class="w-4 border-t-2 border-dashed border-gray-400"></div>
       <span>Mean solar noon (clock average)</span>
     </div>
-  </div>
+  {/snippet}
 
   <!-- Hover tooltip -->
   {#if hoveredIndex != null && isHovering}
     {@const day = noonData[hoveredIndex]}
-    <div
-      class="fixed z-50 px-2 py-1.5 text-xs rounded shadow-lg bg-gray-800 text-gray-100 dark:bg-gray-700 dark:text-gray-200 pointer-events-none"
-      style="left: {tooltipX + 12}px; top: {tooltipY + 8}px;"
-    >
-      <div class="font-medium">{formatDateShort(day.date)}</div>
-      <div>Solar noon: {formatTimeInTimezone(day.solarNoon, timezone)}</div>
-      <div>Equation of time: {formatDurationChangeMinutesSeconds(day.equationOfTime * 60000)}</div>
-    </div>
+    <ChartTooltip x={tooltipX} y={tooltipY} title={formatDateShort(day.date)} rows={[
+      { label: 'Solar noon', value: formatTimeInTimezone(day.solarNoon, timezone) },
+      { label: 'Equation of time', value: formatDurationChangeMinutesSeconds(day.equationOfTime * 60000) }
+    ]} />
   {/if}
-</div>
+</ChartCard>

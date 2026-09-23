@@ -1,8 +1,8 @@
 <script>
-  import SectionLink from './SectionLink.svelte';
+  import ChartCard from './ChartCard.svelte';
+  import DayTooltip from './DayTooltip.svelte';
   import { 
     formatDateShort, 
-    getDayStatsForTooltip,
     getUpcomingAstronomicalEvents, 
     findUpcomingDaylightMilestones,
     findUpcomingSunriseMilestones,
@@ -259,11 +259,7 @@
   });
 </script>
 
-<div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
-  <div class="flex items-center gap-0.5 mb-4">
-    <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">Noteworthy upcoming dates</h3>
-    <SectionLink id="upcoming" />
-  </div>
+<ChartCard id="upcoming" title="Noteworthy upcoming dates" subtitle="Solstices, clock changes and round-number sunrises, sunsets and day lengths.">
   
   {#if groupedEvents.length > 0}
     <div class="overflow-x-auto">
@@ -339,19 +335,10 @@
         </button>
       </div>
     {:else}
-      <p>Subscribable calendars are available for the preset locations (choose one in Settings).</p>
+      <p>Subscribable calendars are available for the preset locations (pick one from the location search).</p>
     {/if}
   </div>
   {#if hoveredGroup}
-    {@const stats = getDayStatsForTooltip(hoveredGroup.date, latitude, longitude, timezone)}
-    <div
-      class="fixed z-50 px-2 py-1.5 text-xs rounded shadow-lg bg-gray-800 text-gray-100 dark:bg-gray-700 dark:text-gray-200 pointer-events-none"
-      style="left: {tooltipX + 12}px; top: {tooltipY + 8}px;"
-    >
-      <div class="font-medium">{stats.dateLabel}</div>
-      <div>Sunrise: {stats.sunrise}</div>
-      <div>Sunset: {stats.sunset}</div>
-      <div>Daylight: {stats.daylight}</div>
-    </div>
+    <DayTooltip x={tooltipX} y={tooltipY} date={hoveredGroup.date} {latitude} {longitude} {timezone} />
   {/if}
-</div>
+</ChartCard>

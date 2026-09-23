@@ -1,7 +1,8 @@
 <script>
   import { computeYearData, getSunData, getDayOfYear, getDaysInYear, formatDuration, formatDateShort } from '../lib/solar.js';
   import { PRESET_LOCATION_GROUPS, PRESET_LOCATIONS, formatTimeInTimezone, formatDurationChange } from '../lib/utils.js';
-  import SectionLink from './SectionLink.svelte';
+  import ChartCard from './ChartCard.svelte';
+  import ChartTooltip from './ChartTooltip.svelte';
 
   let {
     selectedDate, latitude, longitude, timezone,
@@ -19,8 +20,8 @@
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const hereColor = 'rgb(59, 130, 246)';
-  const otherColor = 'rgb(139, 92, 246)';
+  const hereColor = 'var(--color-sun)';
+  const otherColor = 'var(--color-compare)';
 
   let other = $derived(PRESET_LOCATIONS.find((p) => p.name === compareName) ?? null);
   let year = $derived(selectedDate.getFullYear());
@@ -110,13 +111,9 @@
   });
 </script>
 
-<div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm flex flex-col">
-  <div class="flex items-center justify-between mb-3 gap-2 flex-wrap">
-    <div class="flex items-center gap-0.5">
-      <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">Compare locations</h3>
-      <SectionLink id="compare" />
-    </div>
-    <label class="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+<ChartCard id="compare" title="Compare locations" subtitle="Daylight through the year here and somewhere else.">
+  {#snippet actions()}
+    <label class="flex items-center gap-2">
       <span>Compare with:</span>
       <select
         value={compareName ?? ''}
@@ -133,7 +130,7 @@
         {/each}
       </select>
     </label>
-  </div>
+  {/snippet}
 
   {#if other}
     <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions a11y_no_noninteractive_element_interactions -->
@@ -159,10 +156,10 @@
       <path d={linePath(hereYear)} fill="none" stroke={hereColor} stroke-width="2" stroke-linejoin="round" />
 
       {#if hoveredIndex != null}
-        <line x1={xScale(hoveredIndex)} y1={padding.top} x2={xScale(hoveredIndex)} y2={padding.top + chartHeight} stroke="rgb(59, 130, 246)" stroke-width="2" stroke-opacity="0.6" />
+        <line x1={xScale(hoveredIndex)} y1={padding.top} x2={xScale(hoveredIndex)} y2={padding.top + chartHeight} stroke="var(--color-ink-muted)" stroke-width="2" stroke-opacity="0.6" />
       {/if}
       {#if selectedIndex != null}
-        <line x1={xScale(selectedIndex)} y1={padding.top} x2={xScale(selectedIndex)} y2={padding.top + chartHeight} stroke="rgb(234, 88, 12)" stroke-width="2" stroke-opacity="0.9" />
+        <line x1={xScale(selectedIndex)} y1={padding.top} x2={xScale(selectedIndex)} y2={padding.top + chartHeight} stroke="var(--color-ink)" stroke-width="2" stroke-opacity="0.9" />
       {/if}
     </svg>
 
@@ -198,16 +195,12 @@
     </p>
 
     {#if hoveredIndex != null && isHovering}
-      <div
-        class="fixed z-50 px-2 py-1.5 text-xs rounded shadow-lg bg-gray-800 text-gray-100 dark:bg-gray-700 dark:text-gray-200 pointer-events-none"
-        style="left: {tooltipX + 12}px; top: {tooltipY + 8}px;"
-      >
-        <div class="font-medium">{formatDateShort(hereYear[hoveredIndex].date)}</div>
-        <div>Here: {formatDuration(hereYear[hoveredIndex].daylight)}</div>
-        <div>{other.name}: {formatDuration(otherYear[hoveredIndex].daylight)}</div>
-      </div>
+      <ChartTooltip x={tooltipX} y={tooltipY} title={formatDateShort(hereYear[hoveredIndex].date)} rows={[
+        { label: 'Here', value: formatDuration(hereYear[hoveredIndex].daylight), swatch: hereColor },
+        { label: other.name, value: formatDuration(otherYear[hoveredIndex].daylight), swatch: otherColor }
+      ]} />
     {/if}
   {:else}
     <p class="text-sm text-gray-500 dark:text-gray-400">Pick a location to compare daylight through the year.</p>
   {/if}
-</div>
+</ChartCard>

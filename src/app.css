@@ -1,5 +1,47 @@
 @import "tailwindcss";
 
+/*
+ * Chart colour roles. Every chart uses these, so a colour means the same thing everywhere:
+ *   sky ramp  - day / civil / nautical / astronomical twilight / night (a fixed semantic scale)
+ *   sun       - lines and marks for the sun itself (day length, sun path, solar noon)
+ *   compare   - the second location in comparisons (validated against sun for CVD in both modes)
+ *   gain/loss - rate of change above/below zero
+ *   ink       - annotations: the selected date (solid), mirror date (dashed), hover (muted)
+ *   halo      - the card surface, drawn under annotation lines so they read on any fill
+ * Dark values are their own steps, not an automatic flip.
+ */
+@theme {
+  --color-day: #fcd34d;
+  --color-civil: #86b6ef;
+  --color-nautical: #3987e5;
+  --color-astro: #1c5cab;
+  --color-night: #0d2a52;
+  --color-sun: #c98500;
+  --color-compare: #2a78d6;
+  --color-gain: #c98500;
+  --color-loss: #2a78d6;
+  --color-ink: #111827;
+  --color-ink-muted: #6b7280;
+  --color-halo: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-day: #fcd34d;
+    --color-civil: #6da7ec;
+    --color-nautical: #2a78d6;
+    --color-astro: #184f95;
+    --color-night: #0b1a33;
+    --color-sun: #f0b429;
+    --color-compare: #5598e7;
+    --color-gain: #f0b429;
+    --color-loss: #5598e7;
+    --color-ink: #f9fafb;
+    --color-ink-muted: #9ca3af;
+    --color-halo: #1f2937;
+  }
+}
+
 :root {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   line-height: 1.5;

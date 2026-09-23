@@ -202,13 +202,13 @@
 
     <!-- Hover marker -->
     {#if hoverPoint}
-      <circle cx={hoverPoint[0]} cy={hoverPoint[1]} r="4" fill="rgb(59, 130, 246)" fill-opacity="0.8" stroke="white" stroke-width="1" />
+      <circle cx={hoverPoint[0]} cy={hoverPoint[1]} r="4" fill="var(--color-ink-muted)" fill-opacity="0.8" stroke="var(--color-halo)" stroke-width="1" />
     {/if}
 
     <!-- Selected position marker -->
     {#if selectedPoint}
-      <circle cx={selectedPoint[0]} cy={selectedPoint[1]} r="5" fill="none" stroke="rgb(234, 88, 12)" stroke-width="1.6" />
-      <circle cx={selectedPoint[0]} cy={selectedPoint[1]} r="1.6" fill="rgb(234, 88, 12)" />
+      <circle cx={selectedPoint[0]} cy={selectedPoint[1]} r="5" fill="none" stroke="var(--color-ink)" stroke-width="1.6" />
+      <circle cx={selectedPoint[0]} cy={selectedPoint[1]} r="1.6" fill="var(--color-ink)" />
     {/if}
 
     <!-- Globe outline -->

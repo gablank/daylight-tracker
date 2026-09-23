@@ -1,7 +1,8 @@
 <script>
   import { getDayOfYear, getSunPosition, formatDateShort } from '../lib/solar.js';
   import { dateAtLocalInTimezone } from '../lib/utils.js';
-  import SectionLink from './SectionLink.svelte';
+  import ChartCard from './ChartCard.svelte';
+  import ChartTooltip from './ChartTooltip.svelte';
 
   let { yearData, selectedDate, oppositeDate = null, latitude = 0, longitude = 0, timezone = null, hoveredDate = null, onHoverDate = null, onDateSelect = null, hoveredHour = null, onHoverHour = null, selectedHour = $bindable(12) } = $props();
 
@@ -203,25 +204,21 @@
   });
 </script>
 
-<div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm flex flex-col">
-  <div class="flex items-center justify-between mb-3">
-    <div class="flex items-center gap-0.5">
-      <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">Sun position by date</h3>
-      <SectionLink id="sun-position" />
-    </div>
-    <label class="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
-      <span>Hour:</span>
+<ChartCard id="sun-position" title="Sun position by date" subtitle="Where the sun is at the same clock time on every day of the year.">
+  {#snippet actions()}
+    <label class="flex items-center gap-2">
+      <span>Hour</span>
       <input
         type="range"
         min="0"
         max="23"
         value={Math.round(displayedHour)}
         oninput={(e) => selectedHour = parseInt(e.currentTarget.value, 10)}
-        class="w-20 accent-blue-600"
+        class="w-24 accent-blue-600"
       />
-      <span class="w-12 text-center font-mono text-gray-900 dark:text-gray-100">{String(Math.floor(displayedHour)).padStart(2, '0')}:{String(Math.round((displayedHour % 1) * 60)).padStart(2, '0')}</span>
+      <span class="w-11 text-right font-medium tabular-nums text-gray-900 dark:text-gray-100">{String(Math.floor(displayedHour)).padStart(2, '0')}:{String(Math.round((displayedHour % 1) * 60)).padStart(2, '0')}</span>
     </label>
-  </div>
+  {/snippet}
   <div class="min-h-0">
   <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions a11y_no_noninteractive_element_interactions -->
   <svg
@@ -306,7 +303,7 @@
         cy={yScale(oppositeDot.altitude)}
         r="7"
         fill="none"
-        stroke="rgb(16, 185, 129)"
+        stroke="var(--color-ink)"
         stroke-width="2"
         stroke-dasharray="3 2"
       />
@@ -319,7 +316,7 @@
         cy={yScale(hoveredDot.altitude)}
         r="7"
         fill="none"
-        stroke="rgb(59, 130, 246)"
+        stroke="var(--color-ink-muted)"
         stroke-width="2"
       />
     {/if}
@@ -330,8 +327,8 @@
         cx={xScale(selectedDot.compassAzimuth)}
         cy={yScale(selectedDot.altitude)}
         r="5"
-        fill="rgb(234, 88, 12)"
-        stroke="white"
+        fill="var(--color-ink)"
+        stroke="var(--color-halo)"
         stroke-width="1.5"
       />
     {/if}
@@ -340,13 +337,9 @@
 
   <!-- Tooltip -->
   {#if hoveredDot && isHovering}
-    <div
-      class="fixed z-50 px-2 py-1.5 text-xs rounded shadow-lg bg-gray-800 text-gray-100 dark:bg-gray-700 dark:text-gray-200 pointer-events-none"
-      style="left: {tooltipX + 12}px; top: {tooltipY + 8}px;"
-    >
-      <div class="font-medium">{formatDateShort(hoveredDot.date)}</div>
-      <div>Altitude: {hoveredDot.altitude.toFixed(1)}°</div>
-      <div>Direction: {formatDirection(hoveredDot.compassAzimuth)} ({Math.round(hoveredDot.compassAzimuth)}°)</div>
-    </div>
+    <ChartTooltip x={tooltipX} y={tooltipY} title={formatDateShort(hoveredDot.date)} rows={[
+      { label: 'Altitude', value: `${hoveredDot.altitude.toFixed(1)}°` },
+      { label: 'Direction', value: `${formatDirection(hoveredDot.compassAzimuth)} (${Math.round(hoveredDot.compassAzimuth)}°)` }
+    ]} />
   {/if}
-</div>
+</ChartCard>
