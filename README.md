@@ -51,13 +51,13 @@ A unified table showing:
 - **DST Changes**: Daylight saving time transitions with exact sun times
 - **Polar Events**: Midnight sun begins/ends, polar night begins/ends
 
-### Sun Path
-- Sun's direction and altitude through the selected day
-- Golden hour (sun -4° to +6°) and blue hour (-6° to -4°)
-- Shadow length and direction at the selected hour
+### The Sky
+- **Time of day** control shared by the sky charts, map and moon (hovering any day curve previews an hour)
+- **Sun path**: the sky from above with the selected day's track against both solstice tracks, sunrise/sunset directions, golden hour (sun -4° to +6°) and blue hour (-6° to -4°), and the sun and its shadow at the chosen time
+- **Analemma**: where the sun is at that clock time on every day of the year, drawn to true shape and fitted to the figure
 
 ### Moon
-- Phase and illumination, moonrise/moonset, and the next new, first quarter, full and last quarter moons
+- Phase and illumination, moonrise/moonset, and the next new, first quarter, full and last quarter moons (click one to jump to it)
 
 ### Compare Locations
 - Daylight through the year for two locations, and their sun times side by side

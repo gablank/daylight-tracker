@@ -1,518 +1,239 @@
 <script>
-  import { getSunPathForDay, getSunData, getSunPosition, getGoldenBlueHours } from '../lib/solar.js';
-  import { formatTimeInTimezone, getHourInTimezone } from '../lib/utils.js';
+  import { getSunPathForDay, getSunData, getSunPosition, getGoldenBlueHours, getSummerSolstice, getWinterSolstice } from '../lib/solar.js';
+  import { formatTimeInTimezone, getHourInTimezone, calendarDateInTimezone } from '../lib/utils.js';
   import ChartCard from './ChartCard.svelte';
   import ChartTooltip from './ChartTooltip.svelte';
 
-  let { selectedDate, latitude, longitude, timezone, highlightHour = null, onHoverHour = null } = $props();
+  /**
+   * The sky seen from above: horizon at the rim, zenith in the middle, north up.
+   * Shows the selected day's track against the two solstice tracks, and the sun
+   * (with the shadow it casts) at the selected hour.
+   */
+  let { selectedDate, latitude, longitude, timezone, hour = 12, hoveredHour = null, onHoverHour = null, onSelectHour = null } = $props();
 
-  const size = 280;
+  const size = 360;
   const center = size / 2;
-  const horizonRadius = size / 2 - 34;
+  const R = 140; // horizon radius
 
-  // Tooltip: { time, altitude, azimuth } or null
-  let tooltip = $state(null);
-  let tooltipX = $state(0);
-  let tooltipY = $state(0);
+  // SunCalc azimuth is measured from south, clockwise towards west; compass bearing from north
+  const bearingOf = (azimuth) => (azimuth + 180) % 360;
+  const COMPASS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+  const compass = (bearing) => COMPASS[Math.round((bearing % 360) / 22.5) % 16];
+  const direction = (azimuth) => `${compass(bearingOf(azimuth))} ${Math.round(bearingOf(azimuth))}°`;
 
-  // Diagram angle: 0°=N (top), 90°=E (right), 180°=S (bottom), 270°=W (left) — matches tick marks
-  // SunCalc azimuth: 0=S, 90=W, 180=N, 270=E → diagramAngle = (azimuth + 180) % 360
-  function azimuthToDiagramAngle(azimuth) {
-    return (azimuth + 180) % 360;
-  }
-  function formatDirection(diagramAngle) {
-    const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
-    const i = Math.round(((diagramAngle % 360) / 360) * 8) % 8;
-    return dirs[i];
+  // Zenith in the centre, horizon on the rim; north up, east right
+  function xy(altitude, azimuth) {
+    const r = (Math.max(0, 90 - altitude) / 90) * R;
+    const a = (bearingOf(azimuth) * Math.PI) / 180;
+    return { x: center + r * Math.sin(a), y: center - r * Math.cos(a) };
   }
 
-  // Sun path points for the selected day (in selected timezone so polar and altitude chart align)
-  let pathPoints = $derived.by(() => {
-    if (!selectedDate) return [];
-    return getSunPathForDay(selectedDate, latitude, longitude, timezone);
-  });
-
-  // Polar: North up. SunCalc azimuth: 0° = South, 90° = West, 180° = North, 270° = East (from south to west).
-  // We want angle 0 = North (top), 90° = East (right), 180° = South (bottom), 270° = West (left).
-  // So angle = azimuth - 180.
-  function altAzToXY(altitude, azimuth) {
-    const radius = altitude >= 90 ? 0 : ((90 - altitude) / 90) * horizonRadius;
-    const angleDeg = azimuth - 180;
-    const angleRad = (angleDeg * Math.PI) / 180;
-    return {
-      x: center + radius * Math.sin(angleRad),
-      y: center - radius * Math.cos(angleRad)
-    };
-  }
-
-  // Full path (above + below horizon) for polar; below-horizon segment drawn with same altAzToXY (SVG overflow clips)
-  let pathDAbove = $derived.by(() => {
-    const pts = pathPoints.filter((p) => p.altitude >= -0.5);
-    if (pts.length < 2) return '';
-    return pts
-      .map((p, i) => {
-        const { x, y } = altAzToXY(p.altitude, p.azimuth);
-        return `${i === 0 ? 'M' : 'L'} ${x} ${y}`;
-      })
-      .join(' ');
-  });
-  // Below-horizon path split into evening (after sunset) and morning (before sunrise) so we don't draw a line across
-  let pathDBelowEvening = $derived.by(() => {
-    const pts = pathPoints.filter((p) => p.altitude < -0.5 && getHourInTimezone(p.time, timezone) >= 12);
-    if (pts.length < 2) return '';
-    return pts
-      .map((p, i) => {
-        const { x, y } = altAzToXY(p.altitude, p.azimuth);
-        return `${i === 0 ? 'M' : 'L'} ${x} ${y}`;
-      })
-      .join(' ');
-  });
-  let pathDBelowMorning = $derived.by(() => {
-    const pts = pathPoints.filter((p) => p.altitude < -0.5 && getHourInTimezone(p.time, timezone) < 12);
-    if (pts.length < 2) return '';
-    return pts
-      .map((p, i) => {
-        const { x, y } = altAzToXY(p.altitude, p.azimuth);
-        return `${i === 0 ? 'M' : 'L'} ${x} ${y}`;
-      })
-      .join(' ');
-  });
-
-  let sunData = $derived(getSunData(selectedDate, latitude, longitude, timezone));
-
-  // Altitude vs time chart (to the right of polar)
-  const altChartWidth = 260;
-  const altChartHeight = 220;
-  const altChartPadding = { top: 12, right: 12, bottom: 24, left: 28 };
-  const altChartPlotWidth = altChartWidth - altChartPadding.left - altChartPadding.right;
-  const altChartPlotHeight = altChartHeight - altChartPadding.top - altChartPadding.bottom;
-
-  // Y scale: -90° to 90° (nadir to zenith)
-  const altMin = -90;
-  const altMax = 90;
-  const altRange = altMax - altMin;
-  let altitudePathD = $derived.by(() => {
-    if (!pathPoints.length) return '';
-    return pathPoints
-      .map((p, i) => {
-        const hour = getHourInTimezone(p.time, timezone);
-        const x = altChartPadding.left + (hour / 24) * altChartPlotWidth;
-        const altClamp = Math.max(altMin, Math.min(altMax, p.altitude));
-        const y = altChartPadding.top + altChartPlotHeight - ((altClamp - altMin) / altRange) * altChartPlotHeight;
-        return `${i === 0 ? 'M' : 'L'} ${x} ${y}`;
-      })
-      .join(' ');
-  });
-
-  // Hover marker position: polar (x,y) and altitude chart (x,y) when tooltip is set
-  let tooltipPolarPos = $derived.by(() => {
-    if (!tooltip) return null;
-    return altAzToXY(tooltip.altitude, tooltip.azimuth);
-  });
-  let tooltipAltPos = $derived.by(() => {
-    if (!tooltip) return null;
-    const hour = getHourInTimezone(tooltip.time, timezone);
-    const x = altChartPadding.left + (hour / 24) * altChartPlotWidth;
-    const altClamp = Math.max(altMin, Math.min(altMax, tooltip.altitude));
-    const y = altChartPadding.top + altChartPlotHeight - ((altClamp - altMin) / altRange) * altChartPlotHeight;
-    return { x, y };
-  });
-
-  // Highlight marker: show position at highlightHour (from SunAzimuthChart's slider)
-  let highlightPoint = $derived.by(() => {
-    if (highlightHour == null || !pathPoints.length) return null;
-    // Find the path point closest to the highlight hour
-    let best = null;
-    let bestDiff = Infinity;
-    for (const p of pathPoints) {
-      const h = getHourInTimezone(p.time, timezone);
-      const diff = Math.abs(h - highlightHour);
-      if (diff < bestDiff) { bestDiff = diff; best = p; }
+  // Path segments above the horizon (a day can have several at high latitudes)
+  function trackPath(points) {
+    let d = '';
+    let pen = false;
+    for (const p of points) {
+      if (p.altitude < -0.5) { pen = false; continue; }
+      const { x, y } = xy(p.altitude, p.azimuth);
+      d += `${pen ? 'L' : 'M'}${x.toFixed(1)},${y.toFixed(1)} `;
+      pen = true;
     }
-    if (!best || bestDiff > 0.5) return null; // within ~30 min
+    return d;
+  }
+
+  let points = $derived(getSunPathForDay(selectedDate, latitude, longitude, timezone));
+  let today = $derived(trackPath(points));
+  let year = $derived(selectedDate.getFullYear());
+  let references = $derived([
+    { label: 'Jun', date: calendarDateInTimezone(getSummerSolstice(year), timezone) },
+    { label: 'Dec', date: calendarDateInTimezone(getWinterSolstice(year), timezone) }
+  ].map((r) => {
+    const pts = getSunPathForDay(r.date, latitude, longitude, timezone);
+    const top = pts.reduce((a, b) => (b.altitude > a.altitude ? b : a));
+    return { ...r, d: trackPath(pts), top: top.altitude > 0 ? xy(top.altitude, top.azimuth) : null };
+  }));
+
+  let sun = $derived(getSunData(selectedDate, latitude, longitude, timezone));
+  let noon = $derived(getSunPosition(sun.solarNoon, latitude, longitude));
+  let rise = $derived(sun.sunrise ? getSunPosition(sun.sunrise, latitude, longitude) : null);
+  let set = $derived(sun.sunset ? getSunPosition(sun.sunset, latitude, longitude) : null);
+  let everUp = $derived(points.some((p) => p.altitude >= -0.5));
+
+  // Sun at the shown hour (hovered anywhere on the page, else the selected hour)
+  let shownHour = $derived(hoveredHour ?? hour);
+  let atHour = $derived.by(() => {
+    let best = points[0];
+    for (const p of points) {
+      if (Math.abs(getHourInTimezone(p.time, timezone) - shownHour) < Math.abs(getHourInTimezone(best.time, timezone) - shownHour)) best = p;
+    }
     return best;
   });
-
-  let highlightPolarPos = $derived.by(() => {
-    if (!highlightPoint) return null;
-    return altAzToXY(highlightPoint.altitude, highlightPoint.azimuth);
+  let sunAtHour = $derived(atHour.altitude > 0 ? xy(atHour.altitude, atHour.azimuth) : null);
+  const shadowRatio = (altitude) => 1 / Math.tan((altitude * Math.PI) / 180);
+  // Shadow of a vertical pole at the centre, pointing away from the sun; drawn up to 3× its height
+  let shadowEnd = $derived.by(() => {
+    if (atHour.altitude <= 0) return null;
+    const len = (Math.min(3, shadowRatio(atHour.altitude)) / 3) * R * 0.6;
+    const a = ((bearingOf(atHour.azimuth) + 180) * Math.PI) / 180;
+    return { x: center + len * Math.sin(a), y: center - len * Math.cos(a) };
   });
-
-  let highlightAltPos = $derived.by(() => {
-    if (!highlightPoint) return null;
-    const hour = getHourInTimezone(highlightPoint.time, timezone);
-    const x = altChartPadding.left + (hour / 24) * altChartPlotWidth;
-    const altClamp = Math.max(altMin, Math.min(altMax, highlightPoint.altitude));
-    const y = altChartPadding.top + altChartPlotHeight - ((altClamp - altMin) / altRange) * altChartPlotHeight;
-    return { x, y };
-  });
-
-  // Golden hour (-4° to +6°) and blue hour (-6° to -4°)
-  let goldenBlue = $derived(getGoldenBlueHours(selectedDate, latitude, longitude, timezone));
-
-  function formatPeriod([start, end]) {
-    const t = (d) => formatTimeInTimezone(d, timezone);
-    if (start && end) return `${t(start)}–${t(end)}`;
-    if (start) return `from ${t(start)}`;
-    if (end) return `until ${t(end)}`;
-    return null;
-  }
-
-  // Shadow cast by a vertical object, as a multiple of its height; points away from the sun
   function describeShadow(altitude, azimuth) {
-    if (altitude <= 0) return 'Sun below horizon';
-    const ratio = 1 / Math.tan(altitude * Math.PI / 180);
+    if (altitude <= 0) return 'None (sun below the horizon)';
+    const ratio = shadowRatio(altitude);
     const length = ratio >= 100 ? '100+' : ratio >= 10 ? ratio.toFixed(0) : ratio.toFixed(1);
-    return `${length} × height, pointing ${formatDirection((azimuthToDiagramAngle(azimuth) + 180) % 360)}`;
+    return `${length}× height, towards ${compass((bearingOf(azimuth) + 180) % 360)}`;
   }
 
-  let highlightLabel = $derived.by(() => {
-    if (highlightHour == null) return '';
-    const h = Math.floor(highlightHour);
-    const m = Math.round((highlightHour - h) * 60);
-    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-  });
+  const clock = (h) => `${String(Math.floor(h)).padStart(2, '0')}:${String(Math.round((h % 1) * 60)).padStart(2, '0')}`;
 
-  // Mark sunrise, solar noon, sunset if available
-  let markers = $derived.by(() => {
-    const m = [];
-    if (!sunData.sunrise || !sunData.sunset) return m;
-    const noon = sunData.solarNoon;
-    const risePos = getSunPosition(sunData.sunrise, latitude, longitude);
-    const setPos = getSunPosition(sunData.sunset, latitude, longitude);
-    const noonPos = getSunPosition(noon, latitude, longitude);
-    // Clamp sunrise/sunset altitude to 0: SunCalc's getPosition returns geometric altitude (~-0.833°)
-    // but sunrise/sunset are defined at the apparent horizon (0° after refraction correction)
-    m.push({ label: 'Sunrise', alt: 0, az: risePos.azimuth, time: sunData.sunrise });
-    m.push({ label: 'Noon', alt: noonPos.altitude, az: noonPos.azimuth, time: noon });
-    m.push({ label: 'Sunset', alt: 0, az: setPos.azimuth, time: sunData.sunset });
-    return m;
-  });
+  let goldenBlue = $derived(getGoldenBlueHours(selectedDate, latitude, longitude, timezone));
+  function formatPeriods(periods) {
+    const t = (d) => formatTimeInTimezone(d, timezone);
+    const text = periods.map(([a, b]) => (a && b ? `${t(a)}–${t(b)}` : a ? `from ${t(a)}` : b ? `until ${t(b)}` : null)).filter(Boolean);
+    return text.length ? text.join(', ') : 'None';
+  }
 
-  // Polar: find nearest path point or marker to (svgX, svgY)
-  function handlePolarMouseMove(event) {
-    if (!pathPoints.length) return;
-    const svg = event.currentTarget;
-    const rect = svg.getBoundingClientRect();
-    const scaleX = size / rect.width;
-    const scaleY = size / rect.height;
-    const svgX = (event.clientX - rect.left) * scaleX;
-    const svgY = (event.clientY - rect.top) * scaleY;
-    // Check markers first (sunrise/sunset/noon) - they have priority within close range
+  // Label for a point on the horizon, pushed outside the rim
+  function rimLabel(azimuth, offset = 16) {
+    const a = (bearingOf(azimuth) * Math.PI) / 180;
+    return { x: center + (R + offset) * Math.sin(a), y: center - (R + offset) * Math.cos(a) + 4 };
+  }
+
+  // Hover: nearest point of the day's track
+  let hovered = $state(null);
+  let pointer = $state({ x: 0, y: 0 });
+  function nearest(e) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const sx = ((e.clientX - rect.left) / rect.width) * size;
+    const sy = ((e.clientY - rect.top) / rect.height) * size;
     let best = null;
-    let bestD2 = Infinity;
-    for (const m of markers) {
-      const { x, y } = altAzToXY(m.alt, m.az);
-      const d2 = (x - svgX) ** 2 + (y - svgY) ** 2;
-      if (d2 < bestD2 && d2 < 45) { bestD2 = d2; best = { time: m.time, altitude: m.alt, azimuth: m.az }; }
+    let bestD = 400;
+    for (const p of points) {
+      if (p.altitude < -0.5) continue;
+      const { x, y } = xy(p.altitude, p.azimuth);
+      const d = (x - sx) ** 2 + (y - sy) ** 2;
+      if (d < bestD) { bestD = d; best = p; }
     }
-    // Fall back to path points
-    if (!best) {
-      for (const p of pathPoints) {
-        const { x, y } = altAzToXY(p.altitude, p.azimuth);
-        const d2 = (x - svgX) ** 2 + (y - svgY) ** 2;
-        if (d2 < bestD2) { bestD2 = d2; best = p; }
-      }
-    }
-    if (best) {
-      tooltip = { time: best.time, altitude: best.altitude, azimuth: best.azimuth };
-      tooltipX = event.clientX;
-      tooltipY = event.clientY;
-      onHoverHour?.(getHourInTimezone(best.time, timezone));
-    }
+    return best;
   }
-  function handlePolarMouseLeave() {
-    tooltip = null;
+  function handleMove(e) {
+    hovered = nearest(e);
+    pointer = { x: e.clientX, y: e.clientY };
+    onHoverHour?.(hovered ? getHourInTimezone(hovered.time, timezone) : null);
+  }
+  function handleLeave() {
+    hovered = null;
     onHoverHour?.(null);
   }
-
-  // Altitude chart: get point from x only. Check markers first for snapping.
-  function handleAltChartMouseMove(event) {
-    if (!pathPoints.length) return;
-    const svg = event.currentTarget;
-    const rect = svg.getBoundingClientRect();
-    const scaleX = altChartWidth / rect.width;
-    const svgX = (event.clientX - rect.left) * scaleX;
-    const svgY = (event.clientY - rect.top) * (altChartHeight / rect.height);
-    const frac = (svgX - altChartPadding.left) / altChartPlotWidth;
-    if (frac < 0 || frac > 1) return;
-    // Check markers first (sunrise/sunset/noon snap)
-    let best = null;
-    let bestD2 = Infinity;
-    for (const m of markers) {
-      const hour = getHourInTimezone(m.time, timezone);
-      const mx = altChartPadding.left + (hour / 24) * altChartPlotWidth;
-      const altClamp = Math.max(altMin, Math.min(altMax, m.alt));
-      const my = altChartPadding.top + altChartPlotHeight - ((altClamp - altMin) / altRange) * altChartPlotHeight;
-      const d2 = (mx - svgX) ** 2 + (my - svgY) ** 2;
-      if (d2 < bestD2 && d2 < 45) { bestD2 = d2; best = { time: m.time, altitude: m.alt, azimuth: m.az }; }
-    }
-    // Fall back to path point by x position
-    if (!best) {
-      const index = Math.max(0, Math.min(pathPoints.length - 1, Math.round(frac * (pathPoints.length - 1))));
-      best = pathPoints[index];
-    }
-    tooltip = { time: best.time, altitude: best.altitude, azimuth: best.azimuth };
-    tooltipX = event.clientX;
-    tooltipY = event.clientY;
-    onHoverHour?.(getHourInTimezone(best.time, timezone));
+  function handleClick(e) {
+    const p = nearest(e);
+    if (p) onSelectHour?.(getHourInTimezone(p.time, timezone));
   }
-  function handleAltChartMouseLeave() {
-    tooltip = null;
-    onHoverHour?.(null);
-  }
-
-  // Clear tooltip on scroll or touchmove so it doesn't stick on mobile
-  $effect(() => {
-    const clear = () => { tooltip = null; onHoverHour?.(null); };
-    window.addEventListener('scroll', clear, true);
-    window.addEventListener('touchmove', clear, true);
-    return () => {
-      window.removeEventListener('scroll', clear, true);
-      window.removeEventListener('touchmove', clear, true);
-    };
-  });
 </script>
 
-<ChartCard id="sun-path" title="Sun path" subtitle="The sun's track across the sky on the selected date, seen from above and from the side.">
-  <div class="flex flex-wrap items-start justify-center gap-4 min-h-0">
-    <!-- Polar sun path -->
-    <div class="flex flex-col shrink-0 w-full max-w-[280px] overflow-visible">
-      <p class="text-[10px] text-gray-500 dark:text-gray-400 mb-1 text-center min-h-[1.25rem] flex items-center justify-center">Direction and altitude</p>
-      <svg
-        viewBox="0 0 {size} {size}"
-        class="w-full max-w-[280px] aspect-square overflow-hidden"
-        role="img"
-        aria-label="Sun path for selected date"
-        onmousemove={handlePolarMouseMove}
-        onmouseleave={handlePolarMouseLeave}
-      >
-        <!-- Horizon circle -->
-        <circle
-          cx={center}
-          cy={center}
-          r={horizonRadius}
-          fill="none"
-          stroke="currentColor"
-          stroke-opacity="0.2"
-          stroke-width="1"
-        />
-        <!-- Dotted N–S meridian (solar noon reference) -->
-        <line
-          x1={center}
-          y1={center - horizonRadius}
-          x2={center}
-          y2={center + horizonRadius}
-          stroke="currentColor"
-          stroke-opacity="0.35"
-          stroke-width="1"
-          stroke-dasharray="4,4"
-        />
-        <!-- Dotted W–E line -->
-        <line
-          x1={center - horizonRadius}
-          y1={center}
-          x2={center + horizonRadius}
-          y2={center}
-          stroke="currentColor"
-          stroke-opacity="0.35"
-          stroke-width="1"
-          stroke-dasharray="4,4"
-        />
-      <!-- Labels every 30° (angle in our coords: 0=N, 90=E, 180=S, 270=W) -->
-      {#each [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330] as angleDeg}
-        {@const angleRad = (angleDeg * Math.PI) / 180}
-        {@const labelRadius = horizonRadius + 12}
-        {@const x = center + labelRadius * Math.sin(angleRad)}
-        {@const y = center - labelRadius * Math.cos(angleRad)}
-        {@const label = angleDeg === 0 ? 'N' : angleDeg === 90 ? 'E' : angleDeg === 180 ? 'S' : angleDeg === 270 ? 'W' : `${angleDeg}°`}
+<ChartCard id="sun-path" title="Sun path" subtitle="The sky from above: horizon at the rim, straight up in the middle, north at the top." class="h-full">
+  <div class="flex flex-wrap items-start gap-x-6 gap-y-4">
+    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
+    <svg
+      viewBox="0 0 {size} {size}"
+      class="mx-auto w-full max-w-[22rem] shrink-0 cursor-crosshair select-none"
+      role="img"
+      aria-label="Sun path on the selected date: rises {rise ? direction(rise.azimuth) : 'not at all'}, highest {noon.altitude.toFixed(0)}°, sets {set ? direction(set.azimuth) : 'not at all'}"
+      onmousemove={handleMove}
+      onmouseleave={handleLeave}
+      onclick={handleClick}
+    >
+      <!-- Sky disc, altitude rings and compass -->
+      <circle cx={center} cy={center} r={R} class="fill-gray-50 dark:fill-gray-900/40" stroke="currentColor" stroke-opacity="0.35" />
+      {#each [30, 60] as alt}
+        <circle cx={center} cy={center} r={((90 - alt) / 90) * R} fill="none" stroke="currentColor" stroke-opacity="0.12" />
+        <text x={center + 3} y={center - ((90 - alt) / 90) * R - 3} class="fill-gray-400 text-[9px] dark:fill-gray-500">{alt}°</text>
+      {/each}
+      <line x1={center} x2={center} y1={center - R} y2={center + R} stroke="currentColor" stroke-opacity="0.12" />
+      <line x1={center - R} x2={center + R} y1={center} y2={center} stroke="currentColor" stroke-opacity="0.12" />
+      {#each ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'] as label, i}
+        {@const a = (i * 45 * Math.PI) / 180}
         <text
-          x={x}
-          y={y + 4}
+          x={center + (R + 14) * Math.sin(a)}
+          y={center - (R + 14) * Math.cos(a) + 4}
           text-anchor="middle"
-          class="fill-gray-400 dark:fill-gray-500 text-[9px]"
+          class="{label.length === 1 ? 'fill-gray-600 font-semibold text-[12px] dark:fill-gray-300' : 'fill-gray-400 text-[10px] dark:fill-gray-500'}"
         >{label}</text>
       {/each}
-      <!-- Sun path below horizon: evening (after sunset) and morning (before sunrise), no line between them -->
-      {#if pathDBelowEvening}
-        <path
-          d={pathDBelowEvening}
-          fill="none"
-          stroke="rgb(245, 158, 11)"
-          stroke-width="1.5"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-opacity="0.5"
-          stroke-dasharray="4,4"
-        />
-      {/if}
-      {#if pathDBelowMorning}
-        <path
-          d={pathDBelowMorning}
-          fill="none"
-          stroke="rgb(245, 158, 11)"
-          stroke-width="1.5"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-opacity="0.5"
-          stroke-dasharray="4,4"
-        />
-      {/if}
-      <!-- Sun path above horizon -->
-      <path
-        d={pathDAbove}
-        fill="none"
-        stroke="rgb(245, 158, 11)"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      />
-      <!-- Sunrise, noon, sunset markers -->
-      {#each markers as m}
-        {@const { x, y } = altAzToXY(m.alt, m.az)}
-        <circle cx={x} cy={y} r={4} fill="var(--color-ink)" stroke="var(--color-halo)" stroke-width="1" />
-        <text
-          x={x}
-          y={y - 8}
-          text-anchor="middle"
-          class="fill-orange-600 dark:fill-orange-400 text-[9px]"
-        >
-          {m.label} {formatTimeInTimezone(m.time, timezone)}
-        </text>
+
+      <!-- Solstice tracks for reference -->
+      {#each references as ref}
+        <path d={ref.d} fill="none" stroke="var(--color-ink-muted)" stroke-opacity="0.7" stroke-width="1.25" stroke-dasharray="4 3" />
+        {#if ref.top}
+          <text x={ref.top.x} y={ref.top.y + 13} text-anchor="middle" class="fill-gray-500 text-[9px] dark:fill-gray-400">{ref.label} {ref.date.getDate()}</text>
+        {/if}
       {/each}
-      <!-- Highlight marker from SunAzimuthChart hour (blue) -->
-      {#if highlightPolarPos && !tooltipPolarPos}
-        <circle
-          cx={highlightPolarPos.x}
-          cy={highlightPolarPos.y}
-          r="5"
-          fill="var(--color-ink-muted)"
-          fill-opacity="0.8"
-          stroke="var(--color-halo)"
-          stroke-width="1"
-        />
+
+      <!-- The selected day -->
+      <path d={today} fill="none" stroke="var(--color-sun)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+      {#if rise}
+        {@const p = xy(0, rise.azimuth)}
+        {@const l = rimLabel(rise.azimuth, -24)}
+        <circle cx={p.x} cy={p.y} r="4" fill="var(--color-sun)" stroke="var(--color-halo)" stroke-width="2" />
+        <text x={l.x} y={l.y - 8} text-anchor="middle" class="fill-gray-700 text-[10px] font-medium dark:fill-gray-200">↑ {formatTimeInTimezone(sun.sunrise, timezone)}</text>
       {/if}
-      <!-- Hover marker on polar plot -->
-      {#if tooltipPolarPos}
-        <circle
-          cx={tooltipPolarPos.x}
-          cy={tooltipPolarPos.y}
-          r="6"
-          fill="none"
-          stroke="var(--color-ink)"
-          stroke-width="2"
-        />
+      {#if set}
+        {@const p = xy(0, set.azimuth)}
+        {@const l = rimLabel(set.azimuth, -24)}
+        <circle cx={p.x} cy={p.y} r="4" fill="var(--color-sun)" stroke="var(--color-halo)" stroke-width="2" />
+        <text x={l.x} y={l.y - 8} text-anchor="middle" class="fill-gray-700 text-[10px] font-medium dark:fill-gray-200">↓ {formatTimeInTimezone(sun.sunset, timezone)}</text>
       {/if}
-      </svg>
-    </div>
-    <!-- Altitude chart -->
-    <div class="min-w-[200px] max-w-[280px] w-full flex flex-col shrink-0">
-      <p class="text-[10px] text-gray-500 dark:text-gray-400 mb-1 text-center min-h-[1.25rem] flex items-center justify-center">Solar height (°)</p>
-      <svg
-        viewBox="0 0 {altChartWidth} {altChartHeight}"
-        class="w-full aspect-auto overflow-visible"
-        style="min-height: 200px;"
-        role="img"
-        aria-label="Solar altitude through the day"
-        onmousemove={handleAltChartMouseMove}
-        onmouseleave={handleAltChartMouseLeave}
-      >
-        <!-- Y-axis grid and labels (-90° to 90°, horizon at 0°) -->
-        {#each [-90, -60, -30, 0, 30, 60, 90] as deg}
-          {@const y = altChartPadding.top + altChartPlotHeight - ((deg - altMin) / altRange) * altChartPlotHeight}
-          {@const isHorizon = deg === 0}
-          <line x1={altChartPadding.left} x2={altChartWidth - altChartPadding.right} y1={y} y2={y} stroke="currentColor" stroke-opacity={isHorizon ? '0.35' : '0.15'} stroke-width={isHorizon ? '1' : '0.5'} stroke-dasharray={isHorizon ? '4,4' : 'none'} />
-          <text x={altChartPadding.left - 4} y={y + 3} text-anchor="end" class="fill-gray-500 dark:fill-gray-400 text-[9px]">{deg}°</text>
-        {/each}
-        <!-- X-axis grid and labels (time) -->
-        {#each [0, 6, 12, 18, 24] as hour}
-          {@const x = altChartPadding.left + (hour / 24) * altChartPlotWidth}
-          <line y1={altChartPadding.top} y2={altChartPadding.top + altChartPlotHeight} x1={x} x2={x} stroke="currentColor" stroke-opacity="0.15" stroke-width="0.5" />
-          <text x={x} y={altChartHeight - 4} text-anchor="middle" class="fill-gray-500 dark:fill-gray-400 text-[9px]">{hour === 24 ? '24' : hour}:00</text>
-        {/each}
-        <!-- Altitude curve -->
-        <path
-          d={altitudePathD}
-          fill="none"
-          stroke="rgb(245, 158, 11)"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        />
-        <!-- Highlight marker from SunAzimuthChart hour (blue) -->
-        {#if highlightAltPos && !tooltipAltPos}
-          <line
-            x1={highlightAltPos.x}
-            y1={altChartPadding.top}
-            x2={highlightAltPos.x}
-            y2={altChartPadding.top + altChartPlotHeight}
-            stroke="var(--color-ink-muted)"
-            stroke-width="1"
-            stroke-dasharray="2,2"
-            stroke-opacity="0.6"
-          />
-          <circle
-            cx={highlightAltPos.x}
-            cy={highlightAltPos.y}
-            r="4"
-            fill="var(--color-ink-muted)"
-            stroke="var(--color-halo)"
-            stroke-width="1"
-          />
-        {/if}
-        <!-- Hover marker on altitude chart -->
-        {#if tooltipAltPos}
-          <line
-            x1={tooltipAltPos.x}
-            y1={altChartPadding.top}
-            x2={tooltipAltPos.x}
-            y2={altChartPadding.top + altChartPlotHeight}
-            stroke="var(--color-ink)"
-            stroke-width="1"
-            stroke-dasharray="2,2"
-            stroke-opacity="0.8"
-          />
-          <circle
-            cx={tooltipAltPos.x}
-            cy={tooltipAltPos.y}
-            r="5"
-            fill="var(--color-ink)"
-            stroke="var(--color-halo)"
-            stroke-width="1"
-          />
-        {/if}
-      </svg>
-    </div>
-  </div>
-  <!-- Light for photographers, and shadow length at the selected hour -->
-  <dl class="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
-    {#each [
-      { label: 'Golden hour', period: goldenBlue.golden, color: 'text-amber-600 dark:text-amber-400' },
-      { label: 'Blue hour', period: goldenBlue.blue, color: 'text-blue-600 dark:text-blue-400' },
-    ] as row}
-      {@const morning = formatPeriod(row.period.morning)}
-      {@const evening = formatPeriod(row.period.evening)}
-      <dt class="font-medium {row.color}">{row.label}</dt>
-      <dd class="text-gray-700 dark:text-gray-300">
-        {#if morning || evening}
-          {[morning, evening].filter(Boolean).join(' and ')}
-        {:else}
-          None today
-        {/if}
+      {#if noon.altitude > 0}
+        {@const p = xy(noon.altitude, noon.azimuth)}
+        <circle cx={p.x} cy={p.y} r="3.5" fill="var(--color-sun)" stroke="var(--color-halo)" stroke-width="2" />
+        <text x={p.x} y={p.y - 9} text-anchor="middle" class="fill-gray-700 text-[10px] font-medium dark:fill-gray-200">{noon.altitude.toFixed(0)}° at {formatTimeInTimezone(sun.solarNoon, timezone)}</text>
+      {/if}
+
+      <!-- Observer, their shadow, and the sun at the shown hour -->
+      {#if shadowEnd}
+        <line x1={center} y1={center} x2={shadowEnd.x} y2={shadowEnd.y} stroke="var(--color-ink)" stroke-opacity="0.45" stroke-width="3" stroke-linecap="round" />
+      {/if}
+      <circle cx={center} cy={center} r="3" fill="var(--color-ink)" />
+      {#if sunAtHour}
+        <circle cx={sunAtHour.x} cy={sunAtHour.y} r="7" fill="var(--color-ink)" stroke="var(--color-halo)" stroke-width="3" />
+      {/if}
+      {#if !everUp}
+        <text x={center} y={center + 22} text-anchor="middle" class="fill-gray-500 text-[12px] dark:fill-gray-400">The sun stays below the horizon</text>
+      {/if}
+    </svg>
+
+    <dl class="grid min-w-[13rem] flex-1 grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+      <dt class="text-gray-500 dark:text-gray-400">Rises</dt>
+      <dd class="font-medium tabular-nums text-gray-900 dark:text-gray-100">{rise ? `${formatTimeInTimezone(sun.sunrise, timezone)} · ${direction(rise.azimuth)}` : sun.isPolarDay ? 'Stays up' : 'Stays down'}</dd>
+      <dt class="text-gray-500 dark:text-gray-400">Highest</dt>
+      <dd class="font-medium tabular-nums text-gray-900 dark:text-gray-100">{noon.altitude.toFixed(1)}° at {formatTimeInTimezone(sun.solarNoon, timezone)} · {compass(bearingOf(noon.azimuth))}</dd>
+      <dt class="text-gray-500 dark:text-gray-400">Sets</dt>
+      <dd class="font-medium tabular-nums text-gray-900 dark:text-gray-100">{set ? `${formatTimeInTimezone(sun.sunset, timezone)} · ${direction(set.azimuth)}` : sun.isPolarDay ? 'Stays up' : 'Stays down'}</dd>
+      <dt class="text-gray-500 dark:text-gray-400">Golden hour</dt>
+      <dd class="font-medium tabular-nums text-gray-900 dark:text-gray-100">{formatPeriods([goldenBlue.golden.morning, goldenBlue.golden.evening])}</dd>
+      <dt class="text-gray-500 dark:text-gray-400">Blue hour</dt>
+      <dd class="font-medium tabular-nums text-gray-900 dark:text-gray-100">{formatPeriods([goldenBlue.blue.morning, goldenBlue.blue.evening])}</dd>
+      <dt class="border-t border-gray-200 pt-2 text-gray-500 dark:border-gray-700 dark:text-gray-400">At {clock(shownHour)}</dt>
+      <dd class="border-t border-gray-200 pt-2 font-medium tabular-nums text-gray-900 dark:border-gray-700 dark:text-gray-100">
+        {atHour.altitude.toFixed(1)}° high, {direction(atHour.azimuth)}
       </dd>
-    {/each}
-    {#if highlightPoint}
-      <dt class="font-medium text-gray-600 dark:text-gray-400">Shadow at {highlightLabel}</dt>
-      <dd class="text-gray-700 dark:text-gray-300">{describeShadow(highlightPoint.altitude, highlightPoint.azimuth)}</dd>
-    {/if}
-  </dl>
-  <!-- Tooltip: Time, solar height, direction (diagram angle: 0°=N, 90°=E, 180°=S, 270°=W) -->
-  {#if tooltip}
-    {@const diagramAngle = azimuthToDiagramAngle(tooltip.azimuth)}
-    <ChartTooltip x={tooltipX} y={tooltipY} title={formatTimeInTimezone(tooltip.time, timezone)} rows={[
-      { label: 'Solar height', value: `${tooltip.altitude.toFixed(1)}°` },
-      { label: 'Direction', value: `${formatDirection(diagramAngle)} (${Math.round(diagramAngle)}°)` },
-      ...(tooltip.altitude > 0 ? [{ label: 'Shadow', value: describeShadow(tooltip.altitude, tooltip.azimuth) }] : [])
+      <dt class="text-gray-500 dark:text-gray-400">Shadow</dt>
+      <dd class="font-medium tabular-nums text-gray-900 dark:text-gray-100">{describeShadow(atHour.altitude, atHour.azimuth)}</dd>
+    </dl>
+  </div>
+
+  {#snippet legend()}
+    <span class="flex items-center gap-1.5"><span class="inline-block w-4 border-t-[3px]" style="border-color: var(--color-sun)"></span>Selected date</span>
+    <span class="flex items-center gap-1.5"><span class="inline-block w-4 border-t-2 border-dashed border-gray-400"></span>Solstices</span>
+    <span class="flex items-center gap-1.5"><span class="inline-block h-3 w-3 rounded-full bg-gray-900 ring-2 ring-white dark:bg-white dark:ring-gray-800"></span>Sun at {clock(shownHour)}</span>
+    <span class="flex items-center gap-1.5"><span class="inline-block h-1 w-4 rounded-full bg-gray-900/45 dark:bg-white/45"></span>Shadow</span>
+  {/snippet}
+
+  {#if hovered}
+    <ChartTooltip x={pointer.x} y={pointer.y} title={formatTimeInTimezone(hovered.time, timezone)} rows={[
+      { label: 'Height', value: `${hovered.altitude.toFixed(1)}°` },
+      { label: 'Direction', value: direction(hovered.azimuth) },
+      { label: 'Shadow', value: describeShadow(hovered.altitude, hovered.azimuth) }
     ]} />
   {/if}
 </ChartCard>

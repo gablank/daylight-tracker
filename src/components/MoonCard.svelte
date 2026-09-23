@@ -56,24 +56,22 @@
   </div>
 
   <!-- Upcoming primary phases -->
-  <h4 class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mt-5 mb-2">Next phases</h4>
-  <table class="w-full text-sm">
-    <tbody>
-      {#each nextPhases as p}
-        <tr class="border-b border-gray-100 dark:border-gray-700/50">
-          <td class="py-1.5 pr-3 text-gray-900 dark:text-gray-100">{p.name}</td>
-          <td class="py-1.5 text-gray-600 dark:text-gray-400">
-            <button
-              type="button"
-              class="cursor-pointer hover:underline focus:outline-none focus:ring-2 focus:ring-orange-400 rounded px-0.5 -mx-0.5"
-              onclick={() => onDateSelect?.(p.day)}
-            >
-              {formatDateShort(p.day)}
-            </button>
-          </td>
-        </tr>
-      {/each}
-    </tbody>
-  </table>
-  <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-2">Phase times are approximate (within a few hours).</p>
+  <h4 class="mt-5 mb-2 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Next phases</h4>
+  <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+    {#each nextPhases as p}
+      <button
+        type="button"
+        class="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left ring-1 ring-gray-200 transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:ring-gray-700 dark:hover:bg-gray-700/50"
+        onclick={() => onDateSelect?.(p.day)}
+        title="Select {formatDateShort(p.day)}"
+      >
+        <MoonDisc instant={p.date} {latitude} {longitude} class="h-7 w-7" />
+        <span class="min-w-0">
+          <span class="block truncate text-xs text-gray-500 dark:text-gray-400">{p.name}</span>
+          <span class="block text-sm font-medium tabular-nums text-gray-900 dark:text-gray-100">{formatDateShort(p.day)}</span>
+        </span>
+      </button>
+    {/each}
+  </div>
+  <p class="mt-2 text-[11px] text-gray-500 dark:text-gray-400">Phase times are approximate (within a few hours).</p>
 </ChartCard>

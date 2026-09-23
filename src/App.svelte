@@ -1,7 +1,7 @@
 <script>
   import { setContext } from 'svelte';
   import { computeYearData, getSunData, findOppositeDate, formatDuration, findUpcomingSunriseMilestones, findUpcomingSunsetMilestones, findUpcomingDSTChanges, findUpcomingDaylightMilestones } from './lib/solar.js';
-  import { getToday, getLocalTimezone, formatTimeInTimezone, formatDateISO, parseDateISO, isValidTimezone } from './lib/utils.js';
+  import { getToday, getLocalTimezone, formatTimeInTimezone, formatDateISO, parseDateISO, isValidTimezone, getHourInTimezone } from './lib/utils.js';
   
   import LocationPicker from './components/LocationPicker.svelte';
   import DateControl from './components/DateControl.svelte';
@@ -45,9 +45,9 @@
   
   // Global hover state - shared across YearGraph, the year charts, and other components
   let globalHoveredDate = $state(null);
-  // Shared hour state between SunAzimuthChart and SunPathChart
+  // Time of day shown in "The sky" (hours after local midnight); hovering a day curve overrides it
   let globalHoveredHour = $state(null);
-  let sunAzimuthSelectedHour = $state(12);
+  let selectedHour = $state(12);
   
   // Load settings: URL params (highest priority) > localStorage > geolocation > defaults
   $effect(() => {
@@ -403,10 +403,34 @@
       {latitude}
       {longitude}
       {timezone}
-      displayHour={sunAzimuthSelectedHour}
+      displayHour={selectedHour}
       onHoverHour={(h) => globalHoveredHour = h}
-      onSelectHour={(h) => sunAzimuthSelectedHour = h}
+      onSelectHour={(h) => selectedHour = h}
     />
+  {/snippet}
+
+  <!-- The time of day the sky charts, map and moon show -->
+  {#snippet hourControl()}
+    <div class="mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl bg-white px-4 py-3 shadow-sm ring-1 ring-gray-200/70 dark:bg-gray-800 dark:ring-gray-700/60">
+      <label for="sky-hour" class="text-sm font-medium text-gray-700 dark:text-gray-300">Time of day</label>
+      <input
+        id="sky-hour"
+        type="range"
+        min="0"
+        max="23.75"
+        step="0.25"
+        bind:value={selectedHour}
+        class="min-w-40 flex-1 accent-blue-600"
+      />
+      <span class="w-12 text-right text-sm font-semibold tabular-nums text-gray-900 dark:text-gray-100">
+        {String(Math.floor(selectedHour)).padStart(2, '0')}:{String(Math.round((selectedHour % 1) * 60)).padStart(2, '0')}
+      </span>
+      <button
+        type="button"
+        class="rounded-md px-2 py-1 text-sm font-medium text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/30"
+        onclick={() => selectedHour = Math.round(getHourInTimezone(new Date(), timezone) * 4) / 4}
+      >Now</button>
+    </div>
   {/snippet}
 
   {#snippet sectionMap()}
@@ -438,9 +462,9 @@
       {/snippet}
       {#if mapExpanded}
         {#if mapView === 'globe'}
-          <Globe bind:latitude bind:longitude selectedDate={globalHoveredDate ?? selectedDate} {timezone} displayHour={globalHoveredHour ?? sunAzimuthSelectedHour} />
+          <Globe bind:latitude bind:longitude selectedDate={globalHoveredDate ?? selectedDate} {timezone} displayHour={globalHoveredHour ?? selectedHour} />
         {:else}
-          <WorldMap bind:latitude bind:longitude selectedDate={globalHoveredDate ?? selectedDate} {timezone} displayHour={globalHoveredHour ?? sunAzimuthSelectedHour} />
+          <WorldMap bind:latitude bind:longitude selectedDate={globalHoveredDate ?? selectedDate} {timezone} displayHour={globalHoveredHour ?? selectedHour} />
         {/if}
       {/if}
     </ChartCard>
@@ -485,9 +509,8 @@
       hoveredDate={globalHoveredDate}
       onHoverDate={(date) => globalHoveredDate = date}
       onDateSelect={(date) => selectedDate = date}
+      hour={selectedHour}
       hoveredHour={globalHoveredHour}
-      onHoverHour={(h) => globalHoveredHour = h}
-      bind:selectedHour={sunAzimuthSelectedHour}
     />
   {/snippet}
 
@@ -497,8 +520,10 @@
       {latitude}
       {longitude}
       {timezone}
-      highlightHour={sunAzimuthSelectedHour}
+      hour={selectedHour}
+      hoveredHour={globalHoveredHour}
       onHoverHour={(h) => globalHoveredHour = h}
+      onSelectHour={(h) => selectedHour = h}
     />
   {/snippet}
 
@@ -511,7 +536,7 @@
   {/snippet}
 
   {#snippet sectionMoon()}
-    <MoonCard {selectedDate} {latitude} {longitude} {timezone} displayHour={globalHoveredHour ?? sunAzimuthSelectedHour} onDateSelect={(date) => selectedDate = date} />
+    <MoonCard {selectedDate} {latitude} {longitude} {timezone} displayHour={globalHoveredHour ?? selectedHour} onDateSelect={(date) => selectedDate = date} />
   {/snippet}
 
   {#snippet sectionCompare()}
@@ -570,9 +595,12 @@
         </Chapter>
 
         <Chapter id="sky" title="The sky" description="Where the sun and moon are, and when.">
+          {@render hourControl()}
           <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
             {@render sectionSunPath()}
             {@render sectionSunPosition()}
+          </div>
+          <div class="mt-6">
             {@render sectionMoon()}
           </div>
         </Chapter>
