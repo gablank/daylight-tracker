@@ -16,6 +16,7 @@
   import UpcomingDates from './components/UpcomingDates.svelte';
   import SolarNoonChart from './components/SolarNoonChart.svelte';
   import MoonCard from './components/MoonCard.svelte';
+  import CompareCard from './components/CompareCard.svelte';
   
   const STORAGE_KEY = 'daylight-tracker-settings';
   
@@ -34,6 +35,7 @@
   let derivativeCount = $state(1);
   let settingsExpanded = $state(true);
   let mapExpanded = $state(true);
+  let compareName = $state(null); // preset name of the location to compare with
   let settingsLoaded = $state(false);
   
   // Global hover state - shared across YearGraph, DaylightChart, and other components
@@ -57,6 +59,7 @@
         if (settings.derivativeCount !== undefined) derivativeCount = Math.max(1, Math.min(5, settings.derivativeCount));
         if (settings.settingsExpanded !== undefined) settingsExpanded = settings.settingsExpanded;
         if (settings.mapExpanded !== undefined) mapExpanded = settings.mapExpanded;
+        if (typeof settings.compareName === 'string') compareName = settings.compareName;
         // Note: selectedDate is NOT restored - always use current date on page load
       } catch {
         // Invalid stored settings, will use defaults
@@ -109,7 +112,8 @@
       timezone,
       derivativeCount,
       settingsExpanded,
-      mapExpanded
+      mapExpanded,
+      compareName
     }));
   });
   
@@ -588,6 +592,21 @@
     </div>
   {/snippet}
 
+  {#snippet sectionCompare()}
+    <div id="compare">
+      <CompareCard
+        {selectedDate}
+        {latitude}
+        {longitude}
+        {timezone}
+        bind:compareName
+        hoveredDate={globalHoveredDate}
+        onHoverDate={(date) => globalHoveredDate = date}
+        onDateSelect={(date) => selectedDate = date}
+      />
+    </div>
+  {/snippet}
+
   <div class="max-w-7xl mx-auto px-4 py-8">
     {#if soloSection}
       <div class="mb-4">
@@ -624,6 +643,8 @@
         {@render sectionSolarNoon()}
       {:else if soloSection === 'moon'}
         {@render sectionMoon()}
+      {:else if soloSection === 'compare'}
+        {@render sectionCompare()}
       {/if}
     {:else}
       <!-- Full layout -->
@@ -644,6 +665,10 @@
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         {@render sectionSolarNoon()}
         {@render sectionMoon()}
+      </div>
+
+      <div class="mb-6">
+        {@render sectionCompare()}
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
