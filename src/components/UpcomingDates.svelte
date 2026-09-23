@@ -161,7 +161,7 @@
     }
     
     // Add astronomical events (priority 4) - with hemisphere-appropriate names
-    const astroEvents = getUpcomingAstronomicalEvents(selectedDate, latitude, 4, timezone);
+    const astroEvents = getUpcomingAstronomicalEvents(selectedDate, latitude, 6, timezone);
     for (const event of astroEvents) {
       events.push({
         date: event.date,

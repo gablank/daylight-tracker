@@ -102,6 +102,43 @@ export function getSeptemberEquinox(year) {
 }
 
 /**
+ * Earth's perihelion (closest to the Sun) or aphelion (farthest) in a given year.
+ * Meeus "Astronomical Algorithms" (Ch 38), including the corrections for the Moon's pull
+ * on Earth; accurate to a few hours.
+ * @param {number} year
+ * @param {boolean} aphelion - true for aphelion, false for perihelion
+ * @returns {Date} The UTC moment of the event
+ */
+function getEarthApsis(year, aphelion) {
+  let k = Math.round(0.99997 * (year - 2000.01));
+  if (aphelion) k += 0.5;
+  const rad = Math.PI / 180;
+  const A = [
+    328.41 + 132.788585 * k,
+    316.13 + 584.903153 * k,
+    346.20 + 450.380738 * k,
+    136.95 + 659.306737 * k,
+    249.52 + 329.653368 * k,
+  ].map((a) => Math.sin(a * rad));
+  const coefficients = aphelion
+    ? [-1.352, 0.061, 0.062, 0.029, 0.031]
+    : [1.278, -0.055, -0.091, -0.056, -0.045];
+  const correction = coefficients.reduce((sum, c, i) => sum + c * A[i], 0);
+  const jde = 2451547.507 + 365.2596358 * k + 0.0000000156 * k * k + correction;
+  return new Date((jde - 2440587.5) * 86400000);
+}
+
+/** Earth's perihelion (closest to the Sun, early January) for a given year */
+export function getPerihelion(year) {
+  return getEarthApsis(year, false);
+}
+
+/** Earth's aphelion (farthest from the Sun, early July) for a given year */
+export function getAphelion(year) {
+  return getEarthApsis(year, true);
+}
+
+/**
  * Noon on a calendar day at a location, as an instant. SunCalc picks the solar transit
  * nearest to the instant it's given, so this decides which day's sunrise/sunset we get.
  * Uses civil noon in the timezone if given, otherwise mean solar noon at the longitude —
@@ -179,24 +216,81 @@ export function getSunData(date, latitude, longitude = 0, timezone = null) {
 }
 
 /**
- * Get all twilight boundary times for a given date.
- * Returns the raw SunCalc times object plus maxAltitude for polar handling.
- * @param {Date} date - The date
- * @param {number} latitude - Latitude
- * @param {number} longitude - Longitude
- * @returns {Object} SunCalc times object with all twilight boundaries + maxAltitude in degrees
+ * Length of each twilight phase on a given day, plus how long true (astronomical) night lasts.
+ * A phase is a duration in ms, 'all night' if the sun never gets past the phase's deeper
+ * boundary (e.g. nautical twilight lasting until dawn at high latitudes in summer),
+ * 'all day' if the sun never gets past its shallower boundary (e.g. civil twilight around
+ * midday during polar night), or null if the phase doesn't happen at all.
+ * @param {Date} date - Calendar day
+ * @param {number} latitude
+ * @param {number} longitude
+ * @param {string|null} timezone - IANA timezone of the location
+ * @returns {{ morning: Object, evening: Object, night: number, lowestAltitude: number, lowestAt: Date }}
+ *   morning/evening have civil, nautical, astronomical; night is ms of darkness below -18°
  */
-const _twilightCache = new LRUCache(CACHE_MAX_LARGE);
-export function getTwilightTimes(date, latitude, longitude = 0) {
-  const cacheKey = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}:${latitude}:${longitude}`;
-  const cached = _twilightCache.get(cacheKey);
-  if (cached) return cached;
+export function getTwilightInfo(date, latitude, longitude = 0, timezone = null) {
+  const t = SunCalc.getTimes(noonOnDay(date, longitude, timezone), latitude, longitude);
+  const ok = (d) => d && !isNaN(d.getTime());
 
-  const times = SunCalc.getTimes(noonOnDay(date, longitude, null), latitude, longitude);
-  const noonPosition = SunCalc.getPosition(times.solarNoon, latitude, longitude);
-  times.maxAltitude = noonPosition.altitude * 180 / Math.PI;
-  _twilightCache.set(cacheKey, times);
-  return times;
+  // Phase between a shallower boundary (e.g. sunset) and a deeper one (e.g. dusk)
+  const phase = (shallow, deep) => {
+    if (ok(shallow) && ok(deep)) return Math.abs(deep.getTime() - shallow.getTime());
+    if (ok(shallow)) return 'all night';
+    if (ok(deep)) return 'all day';
+    return null;
+  };
+
+  const lowestAltitude = SunCalc.getPosition(t.nadir, latitude, longitude).altitude * 180 / Math.PI;
+  const highestAltitude = SunCalc.getPosition(t.solarNoon, latitude, longitude).altitude * 180 / Math.PI;
+  let night;
+  if (ok(t.night) && ok(t.nightEnd)) night = 24 * 3600000 - (t.night.getTime() - t.nightEnd.getTime());
+  else night = highestAltitude < -18 ? 24 * 3600000 : 0; // dark all day, or never dark enough
+
+  return {
+    morning: {
+      civil: phase(t.sunrise, t.dawn),
+      nautical: phase(t.dawn, t.nauticalDawn),
+      astronomical: phase(t.nauticalDawn, t.nightEnd),
+    },
+    evening: {
+      civil: phase(t.sunset, t.dusk),
+      nautical: phase(t.dusk, t.nauticalDusk),
+      astronomical: phase(t.nauticalDusk, t.night),
+    },
+    night,
+    lowestAltitude,
+    lowestAt: t.nadir,
+  };
+}
+
+/**
+ * How much daylight has changed since the most recent solstice, and how much will change
+ * until the next one. Uses longitude 0 like computeYearData, so values match the year charts.
+ * @param {Date} date - Calendar day
+ * @param {number} latitude
+ * @param {string|null} timezone - IANA timezone; solstice dates are calendar days there
+ * @returns {{ daylight: number, last: {name: string, date: Date, daylight: number}, next: {name: string, date: Date, daylight: number} }}
+ */
+export function getSolsticeProgress(date, latitude, timezone = null) {
+  const year = date.getFullYear();
+  const day = new Date(year, date.getMonth(), date.getDate());
+  const solstices = [];
+  for (const y of [year - 1, year, year + 1]) {
+    solstices.push({ northernName: 'Summer Solstice', date: calendarDateInTimezone(getSummerSolstice(y), timezone) });
+    solstices.push({ northernName: 'Winter Solstice', date: calendarDateInTimezone(getWinterSolstice(y), timezone) });
+  }
+  solstices.sort((a, b) => a.date - b.date);
+  const nextIdx = solstices.findIndex((s) => s.date > day);
+  const withDaylight = (s) => ({
+    name: getSeasonName(s.northernName, latitude),
+    date: s.date,
+    daylight: getSunData(s.date, latitude).daylight,
+  });
+  return {
+    daylight: getSunData(day, latitude).daylight,
+    last: withDaylight(solstices[nextIdx - 1]),
+    next: withDaylight(solstices[nextIdx]),
+  };
 }
 
 /**
@@ -592,6 +686,8 @@ export function getUpcomingAstronomicalEvents(currentDate, latitude = 0, count =
     { northernName: 'Summer Solstice', getDate: (y) => getSummerSolstice(y) },
     { northernName: 'Autumn Equinox', getDate: (y) => getSeptemberEquinox(y) },
     { northernName: 'Winter Solstice', getDate: (y) => getWinterSolstice(y) },
+    { northernName: 'Perihelion (Earth closest to the Sun)', getDate: (y) => getPerihelion(y) },
+    { northernName: 'Aphelion (Earth farthest from the Sun)', getDate: (y) => getAphelion(y) },
   ];
   const allEvents = [
     ...eventDefs.map((e) => ({ northernName: e.northernName, date: calendarDateInTimezone(e.getDate(year), timezone) })),

@@ -1,6 +1,6 @@
 <script>
-  import { formatDuration, formatDateShort, getSunData, findDateWithGain, getDayOfYear, getDayStatsForTooltip } from '../lib/solar.js';
-  import { addDays, formatDurationChange } from '../lib/utils.js';
+  import { formatDuration, formatDateShort, getSunData, findDateWithGain, getDayOfYear, getDayStatsForTooltip, getSolsticeProgress, getTwilightInfo } from '../lib/solar.js';
+  import { addDays, formatDurationChange, formatTimeInTimezone } from '../lib/utils.js';
   import SectionLink from './SectionLink.svelte';
   
   let { selectedDate, yearData, latitude, oppositeDate, longitude = 0, timezone = null, onDateSelect = null, onHoverDate = null } = $props();
@@ -89,6 +89,23 @@
       };
     });
   });
+
+  // Section 3: Daylight change since the last solstice / until the next one
+  let solsticeProgress = $derived(selectedDate ? getSolsticeProgress(selectedDate, latitude, timezone) : null);
+
+  // Section 4: Twilight phase lengths on the selected day
+  let twilight = $derived(selectedDate ? getTwilightInfo(selectedDate, latitude, longitude, timezone) : null);
+  const twilightPhases = [
+    { key: 'civil', label: 'Civil', range: '0° to −6°' },
+    { key: 'nautical', label: 'Nautical', range: '−6° to −12°' },
+    { key: 'astronomical', label: 'Astronomical', range: '−12° to −18°' },
+  ];
+
+  function formatPhase(value) {
+    if (typeof value === 'number') return formatDuration(value);
+    if (value === 'all night') return 'All night';
+    return '—';
+  }
 
   // Clear hover/tooltip on scroll or touchmove so it doesn't stick on mobile
   $effect(() => {
@@ -222,6 +239,89 @@
         </table>
       </div>
     </div>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+    <!-- Solstice progress -->
+    {#if solsticeProgress}
+      {@const sinceLast = solsticeProgress.daylight - solsticeProgress.last.daylight}
+      {@const untilNext = solsticeProgress.next.daylight - solsticeProgress.daylight}
+      <div>
+        <h4 class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
+          Solstice Progress
+        </h4>
+        <div class="bg-gray-50 dark:bg-gray-700/30 rounded-md p-3 space-y-2 text-sm text-gray-700 dark:text-gray-300">
+          {#each [
+            { value: sinceLast, text: 'since the', solstice: solsticeProgress.last },
+            { value: untilNext, text: 'to go until the', solstice: solsticeProgress.next },
+          ] as row}
+            <p>
+              <span class="font-semibold {row.value >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}">
+                {formatDurationChange(row.value)}
+              </span>
+              {row.text} {row.solstice.name}
+              (<button
+                type="button"
+                class="cursor-pointer hover:underline focus:outline-none focus:ring-2 focus:ring-orange-400 rounded px-0.5 -mx-0.5"
+                onclick={() => { setHovered(null); onDateSelect?.(row.solstice.date); }}
+                onmouseenter={(e) => { setHovered(row.solstice.date); tooltipX = e.clientX; tooltipY = e.clientY; }}
+                onmousemove={(e) => { tooltipX = e.clientX; tooltipY = e.clientY; }}
+                onmouseleave={() => setHovered(null)}
+              >{formatDateShort(row.solstice.date)}</button>)
+            </p>
+          {/each}
+        </div>
+      </div>
+    {/if}
+
+    <!-- Twilight lengths -->
+    {#if twilight}
+      <div>
+        <h4 class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
+          Twilight on {formatDateShort(selectedDate)}
+        </h4>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-gray-200 dark:border-gray-700">
+                <th class="text-left py-2 pr-3 font-medium text-gray-600 dark:text-gray-400">Phase</th>
+                <th class="text-left py-2 pr-3 font-medium text-gray-600 dark:text-gray-400">Morning</th>
+                <th class="text-left py-2 font-medium text-gray-600 dark:text-gray-400">Evening</th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each twilightPhases as phase}
+                <tr class="border-b border-gray-100 dark:border-gray-700/50">
+                  <td class="py-1.5 pr-3 text-gray-900 dark:text-gray-100">
+                    {phase.label} <span class="text-xs text-gray-500 dark:text-gray-400">({phase.range})</span>
+                  </td>
+                  {#if twilight.morning[phase.key] === 'all day'}
+                    <td colspan="2" class="py-1.5 text-gray-900 dark:text-gray-100 font-medium">All day</td>
+                  {:else}
+                    <td class="py-1.5 pr-3 text-gray-900 dark:text-gray-100 font-medium">{formatPhase(twilight.morning[phase.key])}</td>
+                    <td class="py-1.5 text-gray-900 dark:text-gray-100 font-medium">{formatPhase(twilight.evening[phase.key])}</td>
+                  {/if}
+                </tr>
+              {/each}
+              <tr class="border-b border-gray-100 dark:border-gray-700/50">
+                <td class="py-1.5 pr-3 text-gray-900 dark:text-gray-100">
+                  True night <span class="text-xs text-gray-500 dark:text-gray-400">(below −18°)</span>
+                </td>
+                <td colspan="2" class="py-1.5 text-gray-900 dark:text-gray-100 font-medium">
+                  {twilight.night > 0 ? formatDuration(twilight.night) : 'None'}
+                </td>
+              </tr>
+              <tr>
+                <td class="py-1.5 pr-3 text-gray-900 dark:text-gray-100">Lowest sun</td>
+                <td colspan="2" class="py-1.5 text-gray-900 dark:text-gray-100 font-medium">
+                  {twilight.lowestAltitude.toFixed(1)}° at {formatTimeInTimezone(twilight.lowestAt, timezone)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    {/if}
   </div>
   {#if hoveredDate}
     {@const stats = getDayStatsForTooltip(hoveredDate, latitude, longitude, timezone)}
