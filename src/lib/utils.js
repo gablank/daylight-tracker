@@ -337,6 +337,20 @@ export function getCalendarDayInTimezone(date, timezone) {
 }
 
 /**
+ * Wall-clock time of an instant in a timezone, as fractional hours (0–24), to the second.
+ * Unlike getHourInTimezone (elapsed time since midnight), this is what a clock shows,
+ * so on a DST change day the two differ for times after the change.
+ * @param {Date} date
+ * @param {string} timezone - IANA timezone name
+ * @returns {number}
+ */
+export function clockHoursInTimezone(date, timezone) {
+  const parts = _getFormatter(timezone, { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).formatToParts(date);
+  const get = (type) => parseInt(parts.find((p) => p.type === type).value, 10);
+  return (get('hour') % 24) + get('minute') / 60 + get('second') / 3600;
+}
+
+/**
  * The calendar day an instant falls on in a timezone, as a local-midnight Date
  * (the representation used for calendar days throughout the app)
  * @param {Date} date - An instant

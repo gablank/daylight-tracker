@@ -14,6 +14,7 @@
   import SectionLink from './components/SectionLink.svelte';
   import StatsTable from './components/StatsTable.svelte';
   import UpcomingDates from './components/UpcomingDates.svelte';
+  import SolarNoonChart from './components/SolarNoonChart.svelte';
   
   const STORAGE_KEY = 'daylight-tracker-settings';
   
@@ -566,6 +567,20 @@
     </div>
   {/snippet}
 
+  {#snippet sectionSolarNoon()}
+    <div id="solar-noon">
+      <SolarNoonChart
+        {selectedDate}
+        {latitude}
+        {longitude}
+        {timezone}
+        hoveredDate={globalHoveredDate}
+        onHoverDate={(date) => globalHoveredDate = date}
+        onDateSelect={(date) => selectedDate = date}
+      />
+    </div>
+  {/snippet}
+
   <div class="max-w-7xl mx-auto px-4 py-8">
     {#if soloSection}
       <div class="mb-4">
@@ -598,6 +613,8 @@
         {@render sectionStats()}
       {:else if soloSection === 'upcoming'}
         {@render sectionUpcoming()}
+      {:else if soloSection === 'solar-noon'}
+        {@render sectionSolarNoon()}
       {/if}
     {:else}
       <!-- Full layout -->
@@ -614,7 +631,11 @@
         {@render sectionSunPosition()}
         {@render sectionSunPath()}
       </div>
-      
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        {@render sectionSolarNoon()}
+      </div>
+
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {@render sectionStats()}
         {@render sectionUpcoming()}

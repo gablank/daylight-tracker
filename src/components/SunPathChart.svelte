@@ -1,5 +1,5 @@
 <script>
-  import { getSunPathForDay, getSunData, getSunPosition } from '../lib/solar.js';
+  import { getSunPathForDay, getSunData, getSunPosition, getGoldenBlueHours } from '../lib/solar.js';
   import { formatTimeInTimezone, getHourInTimezone } from '../lib/utils.js';
   import SectionLink from './SectionLink.svelte';
 
@@ -144,6 +144,32 @@
     const altClamp = Math.max(altMin, Math.min(altMax, highlightPoint.altitude));
     const y = altChartPadding.top + altChartPlotHeight - ((altClamp - altMin) / altRange) * altChartPlotHeight;
     return { x, y };
+  });
+
+  // Golden hour (-4° to +6°) and blue hour (-6° to -4°)
+  let goldenBlue = $derived(getGoldenBlueHours(selectedDate, latitude, longitude, timezone));
+
+  function formatPeriod([start, end]) {
+    const t = (d) => formatTimeInTimezone(d, timezone);
+    if (start && end) return `${t(start)}–${t(end)}`;
+    if (start) return `from ${t(start)}`;
+    if (end) return `until ${t(end)}`;
+    return null;
+  }
+
+  // Shadow cast by a vertical object, as a multiple of its height; points away from the sun
+  function describeShadow(altitude, azimuth) {
+    if (altitude <= 0) return 'Sun below horizon';
+    const ratio = 1 / Math.tan(altitude * Math.PI / 180);
+    const length = ratio >= 100 ? '100+' : ratio >= 10 ? ratio.toFixed(0) : ratio.toFixed(1);
+    return `${length} × height, pointing ${formatDirection((azimuthToDiagramAngle(azimuth) + 180) % 360)}`;
+  }
+
+  let highlightLabel = $derived.by(() => {
+    if (highlightHour == null) return '';
+    const h = Math.floor(highlightHour);
+    const m = Math.round((highlightHour - h) * 60);
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
   });
 
   // Mark sunrise, solar noon, sunset if available
@@ -461,6 +487,28 @@
       </svg>
     </div>
   </div>
+  <!-- Light for photographers, and shadow length at the selected hour -->
+  <dl class="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+    {#each [
+      { label: 'Golden hour', period: goldenBlue.golden, color: 'text-amber-600 dark:text-amber-400' },
+      { label: 'Blue hour', period: goldenBlue.blue, color: 'text-blue-600 dark:text-blue-400' },
+    ] as row}
+      {@const morning = formatPeriod(row.period.morning)}
+      {@const evening = formatPeriod(row.period.evening)}
+      <dt class="font-medium {row.color}">{row.label}</dt>
+      <dd class="text-gray-700 dark:text-gray-300">
+        {#if morning || evening}
+          {[morning, evening].filter(Boolean).join(' and ')}
+        {:else}
+          None today
+        {/if}
+      </dd>
+    {/each}
+    {#if highlightPoint}
+      <dt class="font-medium text-gray-600 dark:text-gray-400">Shadow at {highlightLabel}</dt>
+      <dd class="text-gray-700 dark:text-gray-300">{describeShadow(highlightPoint.altitude, highlightPoint.azimuth)}</dd>
+    {/if}
+  </dl>
   <!-- Tooltip: Time, solar height, direction (diagram angle: 0°=N, 90°=E, 180°=S, 270°=W) -->
   {#if tooltip}
     {@const diagramAngle = azimuthToDiagramAngle(tooltip.azimuth)}
@@ -471,6 +519,9 @@
       <div>Time: {formatTimeInTimezone(tooltip.time, timezone)}</div>
       <div>Solar height: {tooltip.altitude.toFixed(1)}°</div>
       <div>Direction: {formatDirection(diagramAngle)} ({Math.round(diagramAngle)}°)</div>
+      {#if tooltip.altitude > 0}
+        <div>Shadow: {describeShadow(tooltip.altitude, tooltip.azimuth)}</div>
+      {/if}
     </div>
   {/if}
 </div>

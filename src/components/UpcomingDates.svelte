@@ -7,7 +7,8 @@
     findUpcomingDaylightMilestones,
     findUpcomingSunriseMilestones,
     findUpcomingSunsetMilestones,
-    findUpcomingDSTChanges
+    findUpcomingDSTChanges,
+    findSunTimeExtremes
   } from '../lib/solar.js';
   
   let { selectedDate, yearData, latitude, longitude, timezone, onDateSelect = null, onHoverDate = null } = $props();
@@ -135,6 +136,17 @@
       });
     }
     
+    // Add earliest/latest sunrise and sunset of the year
+    for (const extreme of findSunTimeExtremes(selectedDate, latitude, longitude, timezone)) {
+      events.push({
+        date: extreme.date,
+        dateKey: getDateKey(extreme.date),
+        description: extreme.description,
+        priority: extreme.type === 'sunrise' ? PRIORITY.SUNRISE : PRIORITY.SUNSET,
+        type: extreme.type
+      });
+    }
+
     // Add daylight milestones (priority 3)
     // Deduplicate same-day events - keep only the "biggest" (highest hour value)
     const daylightMilestones = findUpcomingDaylightMilestones(selectedDate, yearData, latitude, 10);

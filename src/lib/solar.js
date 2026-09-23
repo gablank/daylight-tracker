@@ -1,6 +1,10 @@
 import SunCalc from 'suncalc';
-import { getCalendarDayInTimezone, dateAtLocalInTimezone, formatTimeInTimezone, calendarDateInTimezone } from './utils.js';
+import { getCalendarDayInTimezone, dateAtLocalInTimezone, formatTimeInTimezone, calendarDateInTimezone, clockHoursInTimezone } from './utils.js';
 import { LRUCache, CACHE_MAX_LARGE, CACHE_MAX_SMALL } from './cache.js';
+
+// Sun at -4°: the boundary between blue hour (-6° to -4°) and golden hour (-4° to +6°).
+// Adds times.blueHourEnd (morning) and times.blueHourStart (evening) to SunCalc.getTimes.
+SunCalc.addTime(-4, 'blueHourEnd', 'blueHourStart');
 
 /**
  * Check if a year is a leap year
@@ -45,6 +49,25 @@ function sunEclipticLongitude(jd) {
   let lambda = L + 1.915 * Math.sin(g) + 0.020 * Math.sin(2 * g);
   lambda = ((lambda % 360) + 360) % 360;
   return lambda;
+}
+
+/**
+ * Equation of time in minutes: apparent solar time minus mean solar time
+ * (positive = the sun is ahead, so solar noon comes before mean noon).
+ * Low-precision Meeus formulas; accurate to within a few seconds.
+ * @param {Date} date
+ * @returns {number}
+ */
+export function equationOfTime(date) {
+  const rad = Math.PI / 180;
+  const jd = julianDate(date);
+  const n = jd - 2451545.0;
+  const meanLongitude = 280.466 + 0.9856474 * n;
+  const lambda = sunEclipticLongitude(jd) * rad;
+  const obliquity = (23.439 - 0.0000004 * n) * rad;
+  const rightAscension = Math.atan2(Math.cos(obliquity) * Math.sin(lambda), Math.cos(lambda)) / rad;
+  const diff = ((((meanLongitude - rightAscension) % 360) + 540) % 360) - 180; // wrap to ±180°
+  return diff * 4; // 1° = 4 minutes
 }
 
 /**
@@ -1152,6 +1175,130 @@ export function findUpcomingSunsetMilestones(currentDate, latitude, longitude, t
   
   _sunsetMilestonesCache.set(key, milestones);
   return milestones;
+}
+
+/**
+ * Earliest/latest sunrise and sunset by clock time over the 12 months from the selected date.
+ * By clock time, these don't fall on the solstices (the equation of time shifts them by
+ * up to a few weeks), and DST can move them too.
+ * Days where sunrise/sunset falls on a different calendar day (near polar day/night)
+ * are skipped, since their clock time would wrap around midnight.
+ * @param {Date} currentDate - Calendar day to start from
+ * @param {number} latitude
+ * @param {number} longitude
+ * @param {string} timezone - IANA timezone of the location
+ * @returns {Array<{date: Date, description: string, type: 'sunrise'|'sunset'}>} Sorted by date
+ */
+const _sunTimeExtremesCache = new LRUCache(CACHE_MAX_SMALL);
+export function findSunTimeExtremes(currentDate, latitude, longitude, timezone) {
+  const key = `${currentDate.getFullYear()}-${currentDate.getMonth()}-${currentDate.getDate()}:${latitude}:${longitude}:${timezone}`;
+  const cached = _sunTimeExtremesCache.get(key);
+  if (cached) return cached;
+
+  const extremes = {
+    earliestSunrise: null, latestSunrise: null,
+    earliestSunset: null, latestSunset: null,
+  };
+  const consider = (name, better, day, time) => {
+    const hours = clockHoursInTimezone(time, timezone);
+    if (!extremes[name] || better(hours, extremes[name].hours)) {
+      extremes[name] = { date: day, time, hours };
+    }
+  };
+  const isSameDay = (time, day) => {
+    const cal = getCalendarDayInTimezone(time, timezone);
+    return cal.year === day.getFullYear() && cal.month === day.getMonth() + 1 && cal.day === day.getDate();
+  };
+  const earlier = (a, b) => a < b;
+  const later = (a, b) => a > b;
+
+  for (let offset = 0; offset < 366; offset++) {
+    const day = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate() + offset);
+    const sunData = getSunData(day, latitude, longitude, timezone);
+    if (sunData.sunrise && isSameDay(sunData.sunrise, day)) {
+      consider('earliestSunrise', earlier, day, sunData.sunrise);
+      consider('latestSunrise', later, day, sunData.sunrise);
+    }
+    if (sunData.sunset && isSameDay(sunData.sunset, day)) {
+      consider('earliestSunset', earlier, day, sunData.sunset);
+      consider('latestSunset', later, day, sunData.sunset);
+    }
+  }
+
+  const labels = [
+    ['earliestSunrise', 'Earliest sunrise of the year', 'sunrise'],
+    ['latestSunrise', 'Latest sunrise of the year', 'sunrise'],
+    ['earliestSunset', 'Earliest sunset of the year', 'sunset'],
+    ['latestSunset', 'Latest sunset of the year', 'sunset'],
+  ];
+  const result = labels
+    .filter(([name]) => extremes[name])
+    .map(([name, label, type]) => ({
+      date: extremes[name].date,
+      description: `${label} (${formatTimeInTimezone(extremes[name].time, timezone)})`,
+      type,
+    }))
+    .sort((a, b) => a.date - b.date);
+  _sunTimeExtremesCache.set(key, result);
+  return result;
+}
+
+/**
+ * Golden hour (sun between -4° and +6°) and blue hour (sun between -6° and -4°)
+ * on a given day. Each period is [start, end]; either end is null if the sun doesn't
+ * cross that boundary that day (e.g. golden light lasting all day in winter at high latitudes).
+ * @param {Date} date - Calendar day
+ * @param {number} latitude
+ * @param {number} longitude
+ * @param {string|null} timezone - IANA timezone of the location
+ * @returns {{ golden: {morning: Array, evening: Array}, blue: {morning: Array, evening: Array} }}
+ */
+export function getGoldenBlueHours(date, latitude, longitude = 0, timezone = null) {
+  const t = SunCalc.getTimes(noonOnDay(date, longitude, timezone), latitude, longitude);
+  const valid = (d) => (d && !isNaN(d.getTime()) ? d : null);
+  return {
+    golden: {
+      morning: [valid(t.blueHourEnd), valid(t.goldenHourEnd)],
+      evening: [valid(t.goldenHour), valid(t.blueHourStart)],
+    },
+    blue: {
+      morning: [valid(t.dawn), valid(t.blueHourEnd)],
+      evening: [valid(t.blueHourStart), valid(t.dusk)],
+    },
+  };
+}
+
+/**
+ * Solar noon for every day of a year, with the equation of time: how far solar noon is
+ * from mean solar noon at the longitude (positive = sun is ahead, solar noon comes earlier).
+ * solarNoon comes from SunCalc so it matches the rest of the app; equationOfTime uses the
+ * more accurate equationOfTime() (SunCalc's solar noon runs about 1–1.5 min late).
+ * @param {number} year
+ * @param {number} latitude
+ * @param {number} longitude
+ * @param {string} timezone - IANA timezone of the location
+ * @returns {Array<{date: Date, solarNoon: Date, clockHours: number, equationOfTime: number}>}
+ *   clockHours is solar noon on the local clock; equationOfTime is in minutes
+ */
+const _solarNoonCache = new LRUCache(CACHE_MAX_SMALL);
+export function computeSolarNoonYear(year, latitude, longitude, timezone) {
+  const key = `${year}:${latitude}:${longitude}:${timezone}`;
+  const cached = _solarNoonCache.get(key);
+  if (cached) return cached;
+
+  const result = [];
+  for (let doy = 1; doy <= getDaysInYear(year); doy++) {
+    const date = new Date(year, 0, doy);
+    const { solarNoon } = getSunData(date, latitude, longitude, timezone);
+    result.push({
+      date,
+      solarNoon,
+      clockHours: clockHoursInTimezone(solarNoon, timezone),
+      equationOfTime: equationOfTime(solarNoon),
+    });
+  }
+  _solarNoonCache.set(key, result);
+  return result;
 }
 
 /**
