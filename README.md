@@ -6,6 +6,10 @@ A static web application that visualizes daylight duration throughout the year f
 
 ## Features
 
+### Your Day
+- Day length, change since yesterday and the countdown to the next solstice at a glance
+- The sun's height over 24 hours with night, twilight and daylight underneath, plus sunrise, sunset, solar noon, golden hour and the moon phase
+
 ### Location & Time Settings
 - **Location Selection**: Search presets (Oslo, Longyearbyen, Tokyo, Sydney, etc.), type coordinates, click the map, or use geolocation
 - **Latitude Rail**: Scrub latitude from pole to pole, with the tropics and polar circles marked

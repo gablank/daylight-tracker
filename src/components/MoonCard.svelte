@@ -3,6 +3,7 @@
   import { formatDateShort, timeOnDay } from '../lib/solar.js';
   import { dateAtLocalInTimezone, formatTimeInTimezone, calendarDateInTimezone } from '../lib/utils.js';
   import ChartCard from './ChartCard.svelte';
+  import MoonDisc from './MoonDisc.svelte';
 
   let { selectedDate, latitude, longitude, timezone, displayHour = 12, onDateSelect = null } = $props();
 
@@ -16,17 +17,6 @@
     findNextMoonPhases(noon).map((p) => ({ ...p, day: calendarDateInTimezone(p.date, timezone) }))
   );
 
-  // Moon disc drawn with the lit limb on the right; the terminator is a half-ellipse whose
-  // width follows the illuminated fraction. The whole shape is then rotated so the lit limb
-  // points where the observer sees it (SVG rotation is clockwise, the zenith angle is not).
-  const R = 40;
-  let litPath = $derived.by(() => {
-    const rx = Math.abs(1 - 2 * phase.fraction) * R;
-    const terminatorSweep = phase.fraction < 0.5 ? 0 : 1;
-    return `M 0 ${-R} A ${R} ${R} 0 0 1 0 ${R} A ${rx} ${R} 0 0 ${terminatorSweep} 0 ${-R} Z`;
-  });
-  let litRotation = $derived(-orientation.zenithAngle - 90);
-
   function formatRiseSet(time) {
     return time ? formatTimeInTimezone(time, timezone) : 'None today';
   }
@@ -37,11 +27,7 @@
   <div class="flex flex-wrap items-center gap-6">
     <!-- Phase -->
     <div class="flex items-center gap-4">
-      <svg viewBox="-44 -44 88 88" class="w-24 h-24 shrink-0" role="img" aria-label="{phase.name}, {Math.round(phase.fraction * 100)}% illuminated">
-        <circle r={R} class="fill-gray-300 dark:fill-gray-700" />
-        <path d={litPath} class="fill-amber-50" transform="rotate({litRotation})" />
-        <circle r={R} fill="none" class="stroke-gray-400 dark:stroke-gray-500" stroke-width="1" />
-      </svg>
+      <MoonDisc {instant} {latitude} {longitude} />
       <div>
         <p class="text-base font-semibold text-gray-900 dark:text-gray-100">{phase.name}</p>
         <p class="text-sm text-gray-600 dark:text-gray-400">{Math.round(phase.fraction * 100)}% illuminated</p>

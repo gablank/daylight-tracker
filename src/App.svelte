@@ -22,6 +22,7 @@
   import CompareCard from './components/CompareCard.svelte';
   import ChartCard from './components/ChartCard.svelte';
   import Chapter from './components/Chapter.svelte';
+  import DayHero from './components/DayHero.svelte';
   
   const STORAGE_KEY = 'daylight-tracker-settings';
   
@@ -401,6 +402,18 @@
     </div>
   </header>
 
+  {#snippet sectionToday()}
+    <DayHero
+      {selectedDate}
+      {latitude}
+      {longitude}
+      {timezone}
+      displayHour={sunAzimuthSelectedHour}
+      onHoverHour={(h) => globalHoveredHour = h}
+      onSelectHour={(h) => sunAzimuthSelectedHour = h}
+    />
+  {/snippet}
+
   {#snippet sectionMap()}
     <ChartCard id="map" title="World map" subtitle="Where it's day and night at the selected time. Click to move there.">
       {#snippet actions()}
@@ -573,6 +586,7 @@
     {#if soloSection}
       <!-- Solo mode: show only the selected section -->
       {@const sections = {
+        today: sectionToday,
         map: sectionMap,
         'year-overview': sectionYearOverview,
         daylight: sectionDaylight,
@@ -599,6 +613,8 @@
       {@render sections[soloSection]?.()}
     {:else}
       <div class="space-y-12">
+        {@render sectionToday()}
+
         <Chapter id="year" title="Through the year" description="How daylight grows and shrinks, day by day.">
           <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
             {@render sectionYearOverview()}
