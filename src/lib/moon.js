@@ -102,3 +102,21 @@ export function findNextMoonPhases(from) {
     .filter(Boolean)
     .sort((a, b) => a.date - b.date);
 }
+
+/**
+ * Direction of the moon's lit limb as seen by an observer, measured from the zenith
+ * ("straight up") towards the observer's left, i.e. counter-clockwise on the sky.
+ * (Meeus: position angle of the bright limb minus the parallactic angle.)
+ * @param {Date} date
+ * @param {number} latitude
+ * @param {number} longitude
+ * @returns {{ zenithAngle: number, altitude: number }} degrees
+ */
+export function getMoonOrientation(date, latitude, longitude) {
+  const { angle } = SunCalc.getMoonIllumination(date);
+  const { parallacticAngle, altitude } = SunCalc.getMoonPosition(date, latitude, longitude);
+  return {
+    zenithAngle: (angle - parallacticAngle) * 180 / Math.PI,
+    altitude: altitude * 180 / Math.PI,
+  };
+}

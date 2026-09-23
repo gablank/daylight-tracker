@@ -1,30 +1,31 @@
 <script>
-  import { getMoonPhase, getMoonRiseSet, findNextMoonPhases } from '../lib/moon.js';
-  import { formatDateShort } from '../lib/solar.js';
+  import { getMoonPhase, getMoonRiseSet, findNextMoonPhases, getMoonOrientation } from '../lib/moon.js';
+  import { formatDateShort, timeOnDay } from '../lib/solar.js';
   import { dateAtLocalInTimezone, formatTimeInTimezone, calendarDateInTimezone } from '../lib/utils.js';
   import SectionLink from './SectionLink.svelte';
 
-  let { selectedDate, latitude, longitude, timezone, onDateSelect = null } = $props();
+  let { selectedDate, latitude, longitude, timezone, displayHour = 12, onDateSelect = null } = $props();
 
-  // Phase and upcoming phases are taken from noon on the selected day, in the location's timezone
+  // Phase and orientation are shown at the selected hour; upcoming phases are searched from noon
+  let instant = $derived(timeOnDay(selectedDate, displayHour ?? 12, timezone));
   let noon = $derived(dateAtLocalInTimezone(selectedDate.getFullYear(), selectedDate.getMonth() + 1, selectedDate.getDate(), 12, 0, timezone));
-  let phase = $derived(getMoonPhase(noon));
+  let phase = $derived(getMoonPhase(instant));
+  let orientation = $derived(getMoonOrientation(instant, latitude, longitude));
   let riseSet = $derived(getMoonRiseSet(selectedDate, latitude, longitude, timezone));
   let nextPhases = $derived(
     findNextMoonPhases(noon).map((p) => ({ ...p, day: calendarDateInTimezone(p.date, timezone) }))
   );
 
-  // Moon disc: the lit limb is on the right while waxing (seen from the northern hemisphere);
-  // the terminator is a half-ellipse whose width follows the phase. Mirrored in the south.
+  // Moon disc drawn with the lit limb on the right; the terminator is a half-ellipse whose
+  // width follows the illuminated fraction. The whole shape is then rotated so the lit limb
+  // points where the observer sees it (SVG rotation is clockwise, the zenith angle is not).
   const R = 40;
   let litPath = $derived.by(() => {
-    const p = phase.phase;
-    const waxing = p < 0.5;
-    const rx = Math.abs(Math.cos(2 * Math.PI * p)) * R;
-    const limbSweep = waxing ? 1 : 0;
-    const terminatorSweep = waxing ? (p < 0.25 ? 0 : 1) : (p < 0.75 ? 0 : 1);
-    return `M 0 ${-R} A ${R} ${R} 0 0 ${limbSweep} 0 ${R} A ${rx} ${R} 0 0 ${terminatorSweep} 0 ${-R} Z`;
+    const rx = Math.abs(1 - 2 * phase.fraction) * R;
+    const terminatorSweep = phase.fraction < 0.5 ? 0 : 1;
+    return `M 0 ${-R} A ${R} ${R} 0 0 1 0 ${R} A ${rx} ${R} 0 0 ${terminatorSweep} 0 ${-R} Z`;
   });
+  let litRotation = $derived(-orientation.zenithAngle - 90);
 
   function formatRiseSet(time) {
     return time ? formatTimeInTimezone(time, timezone) : 'None today';
@@ -42,13 +43,16 @@
     <div class="flex items-center gap-4">
       <svg viewBox="-44 -44 88 88" class="w-24 h-24 shrink-0" role="img" aria-label="{phase.name}, {Math.round(phase.fraction * 100)}% illuminated">
         <circle r={R} class="fill-gray-300 dark:fill-gray-700" />
-        <path d={litPath} class="fill-amber-50" transform={latitude < 0 ? 'scale(-1, 1)' : ''} />
+        <path d={litPath} class="fill-amber-50" transform="rotate({litRotation})" />
         <circle r={R} fill="none" class="stroke-gray-400 dark:stroke-gray-500" stroke-width="1" />
       </svg>
       <div>
         <p class="text-base font-semibold text-gray-900 dark:text-gray-100">{phase.name}</p>
         <p class="text-sm text-gray-600 dark:text-gray-400">{Math.round(phase.fraction * 100)}% illuminated</p>
-        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{formatDateShort(selectedDate)}, 12:00</p>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{formatDateShort(selectedDate)}, {formatTimeInTimezone(instant, timezone)}</p>
+        {#if orientation.altitude < 0}
+          <p class="text-xs text-gray-500 dark:text-gray-400">Below the horizon</p>
+        {/if}
       </div>
     </div>
 

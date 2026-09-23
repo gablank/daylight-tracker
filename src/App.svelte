@@ -610,7 +610,7 @@
 
   {#snippet sectionMoon()}
     <div id="moon">
-      <MoonCard {selectedDate} {latitude} {longitude} {timezone} onDateSelect={(date) => selectedDate = date} />
+      <MoonCard {selectedDate} {latitude} {longitude} {timezone} displayHour={globalHoveredHour ?? sunAzimuthSelectedHour} onDateSelect={(date) => selectedDate = date} />
     </div>
   {/snippet}
 
