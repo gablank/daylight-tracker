@@ -156,6 +156,39 @@ export const PRESET_LOCATION_GROUPS = [
 export const PRESET_LOCATIONS = PRESET_LOCATION_GROUPS.flatMap((g) => g.locations);
 
 /**
+ * The preset at the given coordinates, if any; latitudeOnly presets match by latitude only
+ * @param {number} latitude
+ * @param {number} longitude
+ * @returns {PresetLocation|undefined}
+ */
+export function findPresetLocation(latitude, longitude) {
+  return PRESET_LOCATIONS.find((p) =>
+    Math.abs(p.latitude - latitude) < 0.1 &&
+    (p.latitudeOnly || Math.abs((p.longitude ?? 0) - longitude) < 0.1)
+  );
+}
+
+/**
+ * Format a latitude as e.g. "59.9°N" / "33.9°S" / "0.0°"
+ * @param {number} latitude
+ * @returns {string}
+ */
+export function formatLatitude(latitude) {
+  const dir = latitude > 0 ? 'N' : latitude < 0 ? 'S' : '';
+  return `${Math.abs(latitude).toFixed(1)}°${dir}`;
+}
+
+/**
+ * Format a longitude as e.g. "10.7°E" / "43.2°W" / "0.0°"
+ * @param {number} longitude
+ * @returns {string}
+ */
+export function formatLongitude(longitude) {
+  const dir = longitude > 0 ? 'E' : longitude < 0 ? 'W' : '';
+  return `${Math.abs(longitude).toFixed(1)}°${dir}`;
+}
+
+/**
  * File name (without extension) of a preset location's generated calendar,
  * e.g. "Tromsø, Norway" → "tromso-norway"
  * @param {string} name

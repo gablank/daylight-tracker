@@ -1,10 +1,12 @@
 <script>
   import { setContext } from 'svelte';
-  import { computeYearData, getSunData, findOppositeDate, formatDateShort, formatDuration, findUpcomingSunriseMilestones, findUpcomingSunsetMilestones, findUpcomingDSTChanges, findUpcomingDaylightMilestones } from './lib/solar.js';
+  import { computeYearData, getSunData, findOppositeDate, formatDuration, findUpcomingSunriseMilestones, findUpcomingSunsetMilestones, findUpcomingDSTChanges, findUpcomingDaylightMilestones } from './lib/solar.js';
   import { getToday, getLocalTimezone, formatTimeInTimezone, formatDateISO, parseDateISO, isValidTimezone } from './lib/utils.js';
   
-  import LatitudeSelector from './components/LatitudeSelector.svelte';
-  import DatePicker from './components/DatePicker.svelte';
+  import LocationPicker from './components/LocationPicker.svelte';
+  import DateControl from './components/DateControl.svelte';
+  import LatitudeRail from './components/LatitudeRail.svelte';
+  import AppMenu from './components/AppMenu.svelte';
   import YearGraph from './components/YearGraph.svelte';
   import DaylightChart from './components/DaylightChart.svelte';
   import SunPathChart from './components/SunPathChart.svelte';
@@ -34,7 +36,8 @@
   let timezone = $state('Europe/Oslo');
   let selectedDate = $state(getToday());
   let derivativeCount = $state(1);
-  let settingsExpanded = $state(true);
+  // Which header popover is open: 'location', 'date', 'menu' or null
+  let openPopover = $state(null);
   let mapExpanded = $state(true);
   let mapView = $state('map'); // 'map' or 'globe'
   let compareName = $state(null); // preset name of the location to compare with
@@ -59,7 +62,6 @@
         if (settings.longitude !== undefined) longitude = settings.longitude;
         if (isValidTimezone(settings.timezone)) timezone = settings.timezone;
         if (settings.derivativeCount !== undefined) derivativeCount = Math.max(1, Math.min(5, settings.derivativeCount));
-        if (settings.settingsExpanded !== undefined) settingsExpanded = settings.settingsExpanded;
         if (settings.mapExpanded !== undefined) mapExpanded = settings.mapExpanded;
         if (settings.mapView === 'map' || settings.mapView === 'globe') mapView = settings.mapView;
         if (typeof settings.compareName === 'string') compareName = settings.compareName;
@@ -70,7 +72,7 @@
     }
 
     if (openedFromSharedLink) {
-      // Shared link: its params override stored settings — collapse settings by default
+      // Shared link: its params override stored settings
       const lat = parseFloat(initParams.get('lat'));
       const lon = parseFloat(initParams.get('lon'));
       const tz = initParams.get('tz');
@@ -82,7 +84,6 @@
         const d = parseDateISO(dateStr);
         if (d && !isNaN(d.getTime())) selectedDate = d;
       }
-      settingsExpanded = false;
       settingsLoaded = true;
     } else {
       settingsLoaded = true;
@@ -114,7 +115,6 @@
       longitude,
       timezone,
       derivativeCount,
-      settingsExpanded,
       mapExpanded,
       mapView,
       compareName
@@ -132,7 +132,7 @@
     url.searchParams.set('date', formatDateISO(selectedDate));
     if (solo) {
       url.searchParams.set('view', sectionId);
-    } else {
+    } else if (sectionId) {
       url.hash = sectionId;
     }
     return url.toString();
@@ -190,8 +190,6 @@
   // Uses fixed latitude (45°) so the mirror date is consistent regardless of user location
   let oppositeDate = $derived(findOppositeDate(selectedDate));
   
-  let isToday = $derived(formatDateISO(selectedDate) === formatDateISO(getToday()));
-  
   // Precompute state
   let precomputeProgress = $state(null); // null = idle, 0-1 = in progress
   let precomputedKey = $state(null); // tracks what was precomputed: "date:lng:tz"
@@ -239,16 +237,26 @@
     console.log(`Precomputed ${total} latitudes (-90° to 90°, step 0.5°) for year ${year} in ${elapsed}s`);
   }
   
-  // Global arrow key handler for latitude slider
-  // Snaps to the 0.5° grid so all values are precomputable
+  // Global keyboard shortcuts (listed in the header menu)
+  // Latitude steps snap to the 0.5° grid so all values are precomputable
   function handleGlobalKeydown(e) {
     // Skip if user is typing in an input, textarea, select, or contenteditable
     const tag = document.activeElement?.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || document.activeElement?.isContentEditable) return;
+    // Popovers handle their own keys
+    if (openPopover || document.activeElement?.closest('[role="dialog"]')) return;
     // Leave browser/OS shortcuts alone (e.g. Alt+Left = back); Shift is ours (bigger steps)
     if (e.altKey || e.ctrlKey || e.metaKey) return;
 
-    if (e.key === 'ArrowRight') {
+    const popoverKeys = { l: 'location', d: 'date', '?': 'menu' };
+    const popover = popoverKeys[e.key.toLowerCase()];
+    if (popover) {
+      e.preventDefault();
+      openPopover = popover;
+    } else if (e.key.toLowerCase() === 't') {
+      e.preventDefault();
+      selectedDate = getToday();
+    } else if (e.key === 'ArrowRight') {
       e.preventDefault();
       if (e.shiftKey) {
         // Jump to next 5° boundary
@@ -286,150 +294,110 @@
 }} />
 
 <div class="min-h-screen bg-gray-100 dark:bg-gray-900">
-  <!-- Sticky bar: selected day summary + settings toggle -->
-  <div
-    class="sticky top-0 z-50 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm"
-    role="banner"
-  >
-    <div class="max-w-7xl mx-auto px-4 py-3">
-      <div class="flex flex-nowrap items-center justify-between gap-2 sm:gap-3 min-w-0">
-        <div class="flex flex-wrap items-center gap-2 sm:gap-4 md:gap-6 min-w-0 flex-1">
-          <a
-            href="/"
-            class="text-lg font-bold text-gray-900 dark:text-gray-100 shrink-0 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-            onclick={(e) => { e.preventDefault(); showAllSections(); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-          >
-            Daylight Tracker
-          </a>
-          {#if sunData}
-            <div class="flex flex-wrap items-center gap-2 sm:gap-3 md:gap-5 text-sm min-w-0">
-              <span class="font-medium text-gray-700 dark:text-gray-300 shrink-0">
-                {formatDateShort(selectedDate)}
-              </span>
-              <!-- Sunrise: icon below md, "Sunrise" label from md when there's room -->
-              <span
-                class="flex items-center gap-1 shrink-0"
-                title="Sunrise"
-                aria-label="Sunrise: {sunData.isPolarNight ? '—' : sunData.isPolarDay ? 'Always up' : formatTimeInTimezone(sunData.sunrise, timezone)}"
-              >
-                <span class="md:hidden text-gray-500 dark:text-gray-400" aria-hidden="true">
-                  <svg class="w-4 h-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
-                  </svg>
-                </span>
-                <span class="hidden md:inline text-gray-500 dark:text-gray-400">Sunrise</span>
-                <span class="font-medium text-gray-900 dark:text-gray-100">
-                  {#if sunData.isPolarNight}—
-                  {:else if sunData.isPolarDay}Always up
-                  {:else}{formatTimeInTimezone(sunData.sunrise, timezone)}{/if}
-                </span>
-              </span>
-              <!-- Sunset: icon below md, "Sunset" label from md when there's room -->
-              <span
-                class="flex items-center gap-1 shrink-0"
-                title="Sunset"
-                aria-label="Sunset: {sunData.isPolarNight ? '—' : sunData.isPolarDay ? 'Never sets' : formatTimeInTimezone(sunData.sunset, timezone)}"
-              >
-                <span class="md:hidden text-gray-500 dark:text-gray-400" aria-hidden="true">
-                  <svg class="w-4 h-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                  </svg>
-                </span>
-                <span class="hidden md:inline text-gray-500 dark:text-gray-400">Sunset</span>
-                <span class="font-medium text-gray-900 dark:text-gray-100">
-                  {#if sunData.isPolarNight}—
-                  {:else if sunData.isPolarDay}Never sets
-                  {:else}{formatTimeInTimezone(sunData.sunset, timezone)}{/if}
-                </span>
-              </span>
-              <!-- Daylight: icon below md, "Daylight" label from md when there's room -->
-              <span
-                class="flex items-center gap-1 shrink-0"
-                title="Daylight"
-                aria-label="Daylight: {sunData.isPolarNight ? '0h 0m' : sunData.isPolarDay ? '24h 0m' : formatDuration(sunData.daylight)}"
-              >
-                <span class="md:hidden text-gray-500 dark:text-gray-400" aria-hidden="true">
-                  <svg class="w-4 h-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-                  </svg>
-                </span>
-                <span class="hidden md:inline text-gray-500 dark:text-gray-400">Daylight</span>
-                <span class="font-medium text-gray-900 dark:text-gray-100">
-                  {#if sunData.isPolarNight}0h 0m
-                  {:else if sunData.isPolarDay}24h 0m
-                  {:else}{formatDuration(sunData.daylight)}{/if}
-                </span>
-              </span>
-            </div>
-          {/if}
-        </div>
-        <!-- Latitude slider -->
-        <div class="hidden sm:flex items-center gap-1.5 shrink-0 min-w-0">
-          <label for="lat-slider" class="text-xs text-gray-500 dark:text-gray-400 shrink-0">Lat</label>
-          <input
-            type="range"
-            id="lat-slider"
-            min="-90"
-            max="90"
-            step="0.5"
-            bind:value={latitude}
-            class="w-40 accent-blue-600 cursor-pointer"
-            aria-label="Latitude"
-          />
-          <span class="text-xs font-medium text-gray-700 dark:text-gray-300 w-10 text-right tabular-nums">{latitude.toFixed(1)}°</span>
-          {#if precomputeProgress !== null}
-            <div class="w-16 h-1.5 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden" title="Precomputing... {Math.round(precomputeProgress * 100)}%">
-              <div class="h-full bg-blue-500 transition-all duration-75 rounded-full" style="width: {precomputeProgress * 100}%"></div>
-            </div>
-          {:else}
-            <button
-              type="button"
-              class="text-[10px] px-1.5 py-0.5 rounded border transition-colors shrink-0
-                     {precomputeDone
-                       ? 'border-emerald-400 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30'
-                       : 'border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'}"
-              onclick={precomputeAllLatitudes}
-              title="Precompute year data for all latitudes so the slider is instant"
-            >
-              {precomputeDone ? 'Cached' : 'Precompute'}
-            </button>
-          {/if}
-        </div>
-        <button
-          type="button"
-          disabled={isToday}
-          class="px-3 py-2 rounded-md text-sm font-medium bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shrink-0"
-          onclick={() => selectedDate = getToday()}
-          aria-label={isToday ? 'Selected date is today' : 'Reset to today'}
+  <!-- Sticky header: location, date and latitude controls + selected day summary -->
+  <header class="sticky top-0 z-50 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 pt-2.5 pb-2 space-y-2">
+      <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <a
+          href="/"
+          class="order-1 flex items-center gap-2 text-lg font-bold text-gray-900 dark:text-gray-100 shrink-0 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+          onclick={(e) => { e.preventDefault(); showAllSections(); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+          aria-label="Daylight Tracker"
         >
-          Today
-        </button>
-        <button
-          type="button"
-          class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shrink-0"
-          onclick={() => settingsExpanded = !settingsExpanded}
-          aria-expanded={settingsExpanded}
-          aria-label={settingsExpanded ? 'Close settings' : 'Open settings'}
-        >
-          <svg class="w-5 h-5 shrink-0 transition-transform {settingsExpanded ? 'rotate-90' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          <svg class="w-6 h-6 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
           </svg>
-          <span class="hidden md:inline">{settingsExpanded ? 'Close settings' : 'Settings'}</span>
-        </button>
-      </div>
-    </div>
-    <!-- Settings panel (collapsible, below bar when expanded) -->
-    {#if settingsExpanded}
-      <div class="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/80 px-4 py-4">
-        <div class="max-w-7xl mx-auto space-y-4">
-          <LatitudeSelector bind:latitude bind:longitude bind:timezone />
-          <hr class="border-gray-200 dark:border-gray-700" />
-          <DatePicker bind:selectedDate {latitude} {longitude} {timezone} />
+          <span class="hidden md:inline">Daylight Tracker</span>
+        </a>
+        <!-- Controls: own row on phones, inline from sm -->
+        <div class="order-3 sm:order-2 flex w-full sm:w-auto min-w-0 items-center gap-2">
+          <div class="min-w-0 flex-1 sm:flex-none sm:max-w-64">
+            <LocationPicker
+              bind:latitude
+              bind:longitude
+              bind:timezone
+              bind:open={() => openPopover === 'location', (v) => openPopover = v ? 'location' : openPopover === 'location' ? null : openPopover}
+            />
+          </div>
+          <DateControl
+            bind:selectedDate
+            {latitude}
+            {longitude}
+            {timezone}
+            {oppositeDate}
+            bind:open={() => openPopover === 'date', (v) => openPopover = v ? 'date' : openPopover === 'date' ? null : openPopover}
+          />
+        </div>
+        <div class="order-2 sm:order-3 ml-auto flex items-center gap-2 min-w-0">
+      {#if sunData}
+        <div class="flex items-center gap-2.5 sm:gap-3 lg:gap-5 text-sm min-w-0">
+          <!-- Sunrise: icon below xl, "Sunrise" label from xl when there's room -->
+          <span
+            class="flex items-center gap-1 shrink-0"
+            title="Sunrise"
+            aria-label="Sunrise: {sunData.isPolarNight ? '—' : sunData.isPolarDay ? 'Always up' : formatTimeInTimezone(sunData.sunrise, timezone)}"
+          >
+            <span class="xl:hidden text-gray-500 dark:text-gray-400" aria-hidden="true">
+              <svg class="w-4 h-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+              </svg>
+            </span>
+            <span class="hidden xl:inline text-gray-500 dark:text-gray-400">Sunrise</span>
+            <span class="font-medium text-gray-900 dark:text-gray-100">
+              {#if sunData.isPolarNight}—
+              {:else if sunData.isPolarDay}Always up
+              {:else}{formatTimeInTimezone(sunData.sunrise, timezone)}{/if}
+            </span>
+          </span>
+          <!-- Sunset: icon below xl, "Sunset" label from xl when there's room -->
+          <span
+            class="flex items-center gap-1 shrink-0"
+            title="Sunset"
+            aria-label="Sunset: {sunData.isPolarNight ? '—' : sunData.isPolarDay ? 'Never sets' : formatTimeInTimezone(sunData.sunset, timezone)}"
+          >
+            <span class="xl:hidden text-gray-500 dark:text-gray-400" aria-hidden="true">
+              <svg class="w-4 h-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+              </svg>
+            </span>
+            <span class="hidden xl:inline text-gray-500 dark:text-gray-400">Sunset</span>
+            <span class="font-medium text-gray-900 dark:text-gray-100">
+              {#if sunData.isPolarNight}—
+              {:else if sunData.isPolarDay}Never sets
+              {:else}{formatTimeInTimezone(sunData.sunset, timezone)}{/if}
+            </span>
+          </span>
+          <!-- Daylight: icon below xl, "Daylight" label from xl when there's room -->
+          <span
+            class="flex items-center gap-1 shrink-0"
+            title="Daylight"
+            aria-label="Daylight: {sunData.isPolarNight ? '0h 0m' : sunData.isPolarDay ? '24h 0m' : formatDuration(sunData.daylight)}"
+          >
+            <span class="xl:hidden text-gray-500 dark:text-gray-400" aria-hidden="true">
+              <svg class="w-4 h-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+              </svg>
+            </span>
+            <span class="hidden xl:inline text-gray-500 dark:text-gray-400">Daylight</span>
+            <span class="font-medium text-gray-900 dark:text-gray-100">
+              {#if sunData.isPolarNight}0h 0m
+              {:else if sunData.isPolarDay}24h 0m
+              {:else}{formatDuration(sunData.daylight)}{/if}
+            </span>
+          </span>
+        </div>
+      {/if}
+          <AppMenu
+            bind:open={() => openPopover === 'menu', (v) => openPopover = v ? 'menu' : openPopover === 'menu' ? null : openPopover}
+            {precomputeProgress}
+            {precomputeDone}
+            onPrecompute={precomputeAllLatitudes}
+          />
         </div>
       </div>
-    {/if}
-  </div>
+      <LatitudeRail bind:latitude />
+    </div>
+  </header>
 
   {#snippet sectionMap()}
     <div id="map" class="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">

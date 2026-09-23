@@ -7,9 +7,11 @@ A static web application that visualizes daylight duration throughout the year f
 ## Features
 
 ### Location & Time Settings
-- **Location Selection**: Choose latitude/longitude manually, from presets (Oslo, Longyearbyen, Tokyo, Sydney, etc.), or use geolocation
+- **Location Selection**: Search presets (Oslo, Longyearbyen, Tokyo, Sydney, etc.), type coordinates, click the map, or use geolocation
+- **Latitude Rail**: Scrub latitude from pole to pole, with the tropics and polar circles marked
 - **Timezone Selection**: Display times in any timezone
-- **Date Selection**: Pick any date to explore daylight information
+- **Date Selection**: Step through days, or pick one from a calendar shaded by hours of daylight, with jumps to the next equinox, solstice and mirror date
+- **Keyboard Shortcuts**: ←/→ latitude, ↑/↓ date, L location, D date, T today, ? menu
 - **Settings Persistence**: Location and timezone are remembered between visits
 
 ### Interactive Year Graph
