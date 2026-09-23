@@ -337,6 +337,19 @@ export function getCalendarDayInTimezone(date, timezone) {
 }
 
 /**
+ * The calendar day an instant falls on in a timezone, as a local-midnight Date
+ * (the representation used for calendar days throughout the app)
+ * @param {Date} date - An instant
+ * @param {string|null} timezone - IANA timezone name; the browser's timezone if omitted
+ * @returns {Date}
+ */
+export function calendarDateInTimezone(date, timezone) {
+  if (!timezone) return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const { year, month, day } = getCalendarDayInTimezone(date, timezone);
+  return new Date(year, month - 1, day);
+}
+
+/**
  * Get fractional hour (0-24) of a date in a specific timezone, as elapsed time since midnight in that zone.
  * Uses actual UTC difference so DST is correct (avoids Intl format quirks that can cause ~1h shift).
  * @param {Date} date

@@ -77,7 +77,7 @@
       .join(' ');
   });
 
-  let sunData = $derived(getSunData(selectedDate, latitude, longitude));
+  let sunData = $derived(getSunData(selectedDate, latitude, longitude, timezone));
 
   // Altitude vs time chart (to the right of polar)
   const altChartWidth = 260;

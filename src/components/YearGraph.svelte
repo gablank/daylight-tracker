@@ -1,5 +1,6 @@
 <script>
   import { getDateAngle, formatDateShort, formatDuration, getDaysInYear, getWinterSolstice, getSummerSolstice, getMarchEquinox, getSeptemberEquinox, getDayOfYear, getSeasonName, getDayStatsForTooltip } from '../lib/solar.js';
+  import { calendarDateInTimezone } from '../lib/utils.js';
   import SectionLink from './SectionLink.svelte';
   
   let { selectedDate, yearData, oppositeDate, latitude = 0, longitude = 0, timezone = null, hoveredDate = null, onHoverDate = null, onDateSelect = null } = $props();
@@ -232,11 +233,12 @@
     
     // Northern hemisphere names - will be swapped for southern hemisphere
     // id is used for positioning (e.g., March equinox needs y-offset regardless of name)
+    // Dates are the calendar day each event falls on in the selected timezone
     const events = [
-      { id: 'dec-solstice', northernName: 'Winter Solstice', date: getWinterSolstice(year), angle: 0 },
-      { id: 'mar-equinox', northernName: 'Spring Equinox', date: getMarchEquinox(year), angle: null },
-      { id: 'jun-solstice', northernName: 'Summer Solstice', date: getSummerSolstice(year), angle: 180 },
-      { id: 'sep-equinox', northernName: 'Autumn Equinox', date: getSeptemberEquinox(year), angle: null },
+      { id: 'dec-solstice', northernName: 'Winter Solstice', date: calendarDateInTimezone(getWinterSolstice(year), timezone), angle: 0 },
+      { id: 'mar-equinox', northernName: 'Spring Equinox', date: calendarDateInTimezone(getMarchEquinox(year), timezone), angle: null },
+      { id: 'jun-solstice', northernName: 'Summer Solstice', date: calendarDateInTimezone(getSummerSolstice(year), timezone), angle: 180 },
+      { id: 'sep-equinox', northernName: 'Autumn Equinox', date: calendarDateInTimezone(getSeptemberEquinox(year), timezone), angle: null },
     ];
     
     return events.map(event => {

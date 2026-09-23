@@ -1,5 +1,5 @@
 import SunCalc from 'suncalc';
-import { getCalendarDayInTimezone, dateAtLocalInTimezone, formatTimeInTimezone } from './utils.js';
+import { getCalendarDayInTimezone, dateAtLocalInTimezone, formatTimeInTimezone, calendarDateInTimezone } from './utils.js';
 import { LRUCache, CACHE_MAX_LARGE, CACHE_MAX_SMALL } from './cache.js';
 
 /**
@@ -102,21 +102,36 @@ export function getSeptemberEquinox(year) {
 }
 
 /**
+ * Noon on a calendar day at a location, as an instant. SunCalc picks the solar transit
+ * nearest to the instant it's given, so this decides which day's sunrise/sunset we get.
+ * Uses civil noon in the timezone if given, otherwise mean solar noon at the longitude —
+ * never the browser's timezone, which may be far from the location.
+ * @param {Date} date - Calendar day (only year/month/day are used)
+ * @param {number} longitude
+ * @param {string|null} timezone - IANA timezone
+ * @returns {Date}
+ */
+function noonOnDay(date, longitude, timezone) {
+  const y = date.getFullYear(), m = date.getMonth(), d = date.getDate();
+  if (timezone) return dateAtLocalInTimezone(y, m + 1, d, 12, 0, timezone);
+  return new Date(Date.UTC(y, m, d, 12) - longitude * 240000); // 4 min per degree
+}
+
+/**
  * Calculate sun data for a specific date and location
- * @param {Date} date - The date to calculate for
+ * @param {Date} date - The calendar day to calculate for (only year/month/day are used)
  * @param {number} latitude - The latitude (-90 to 90)
  * @param {number} longitude - The longitude (-180 to 180), defaults to 0
+ * @param {string|null} [timezone] - IANA timezone of the location; the calendar day is interpreted in it
  * @returns {Object} Sun data including sunrise, sunset, daylight duration, etc.
  */
 const _sunDataCache = new LRUCache(CACHE_MAX_LARGE);
-export function getSunData(date, latitude, longitude = 0) {
-  const cacheKey = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}:${latitude}:${longitude}`;
+export function getSunData(date, latitude, longitude = 0, timezone = null) {
+  const cacheKey = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}:${latitude}:${longitude}:${timezone}`;
   const cached = _sunDataCache.get(cacheKey);
   if (cached) return cached;
 
-  // Use noon local for the calendar day so SunCalc (UTC-based) gets the correct day;
-  // midnight local can be the previous UTC day in positive-offset timezones.
-  const noon = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0);
+  const noon = noonOnDay(date, longitude, timezone);
   const times = SunCalc.getTimes(noon, latitude, longitude);
   
   const sunrise = times.sunrise;
@@ -177,8 +192,7 @@ export function getTwilightTimes(date, latitude, longitude = 0) {
   const cached = _twilightCache.get(cacheKey);
   if (cached) return cached;
 
-  const noon = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0);
-  const times = SunCalc.getTimes(noon, latitude, longitude);
+  const times = SunCalc.getTimes(noonOnDay(date, longitude, null), latitude, longitude);
   const noonPosition = SunCalc.getPosition(times.solarNoon, latitude, longitude);
   times.maxAltitude = noonPosition.altitude * 180 / Math.PI;
   _twilightCache.set(cacheKey, times);
@@ -494,7 +508,7 @@ export function formatDateShort(date) {
  */
 export function getDayStatsForTooltip(date, latitude, longitude, timezone = null) {
   if (!date) return { dateLabel: '--', sunrise: '--', sunset: '--', daylight: '--', isPolarDay: false, isPolarNight: false };
-  const data = getSunData(date, latitude, longitude);
+  const data = getSunData(date, latitude, longitude, timezone);
   const dateLabel = formatDateShort(date);
   const fmtTime = timezone
     ? (d) => formatTimeInTimezone(d, timezone)
@@ -567,9 +581,10 @@ export function getSeasonName(northernName, latitude) {
  * @param {Date} currentDate - The current date
  * @param {number} latitude - The latitude (for hemisphere-appropriate names)
  * @param {number} count - Number of events to return
- * @returns {Array} Array of upcoming events with date and name
+ * @param {string|null} [timezone] - IANA timezone; event dates are the calendar day the event falls on there
+ * @returns {Array} Array of upcoming events with date (calendar day) and name
  */
-export function getUpcomingAstronomicalEvents(currentDate, latitude = 0, count = 4) {
+export function getUpcomingAstronomicalEvents(currentDate, latitude = 0, count = 4, timezone = null) {
   const events = [];
   const year = currentDate.getFullYear();
   const eventDefs = [
@@ -579,8 +594,8 @@ export function getUpcomingAstronomicalEvents(currentDate, latitude = 0, count =
     { northernName: 'Winter Solstice', getDate: (y) => getWinterSolstice(y) },
   ];
   const allEvents = [
-    ...eventDefs.map((e) => ({ northernName: e.northernName, date: e.getDate(year) })),
-    ...eventDefs.map((e) => ({ northernName: e.northernName, date: e.getDate(year + 1) })),
+    ...eventDefs.map((e) => ({ northernName: e.northernName, date: calendarDateInTimezone(e.getDate(year), timezone) })),
+    ...eventDefs.map((e) => ({ northernName: e.northernName, date: calendarDateInTimezone(e.getDate(year + 1), timezone) })),
   ].sort((a, b) => a.date.getTime() - b.date.getTime());
 
   const startOfSelectedDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
@@ -907,7 +922,7 @@ export function findUpcomingSunriseMilestones(currentDate, latitude, longitude, 
   // Start from day before selected date so events on the selected date (e.g. today) are included
   const dayBefore = new Date(currentDate);
   dayBefore.setDate(dayBefore.getDate() - 1);
-  const initialSunData = getSunData(dayBefore, latitude, longitude);
+  const initialSunData = getSunData(dayBefore, latitude, longitude, timezone);
   let prevHours = getSunriseDecimalHours(initialSunData, timezone);
   
   // Search from selected date (offset 0) up to 365 days forward
@@ -915,7 +930,7 @@ export function findUpcomingSunriseMilestones(currentDate, latitude, longitude, 
     const calendarDate = new Date(currentDate);
     calendarDate.setDate(calendarDate.getDate() + offset);
     
-    const sunData = getSunData(calendarDate, latitude, longitude);
+    const sunData = getSunData(calendarDate, latitude, longitude, timezone);
     const currHours = getSunriseDecimalHours(sunData, timezone);
     
     if (prevHours !== null && currHours !== null && sunData.sunrise) {
@@ -925,8 +940,7 @@ export function findUpcomingSunriseMilestones(currentDate, latitude, longitude, 
       
       if (!isWrapAround) {
         // Use actual sunrise date (may differ from calendar date at extreme latitudes)
-        const eventDate = new Date(sunData.sunrise);
-        eventDate.setHours(0, 0, 0, 0);
+        const eventDate = calendarDateInTimezone(sunData.sunrise, timezone);
         
         // Hour range to check
         const minHour = isExtremeLatitude ? 0 : 3;
@@ -994,7 +1008,7 @@ export function findUpcomingSunsetMilestones(currentDate, latitude, longitude, t
   // Start from day before selected date so events on the selected date (e.g. today) are included
   const dayBefore = new Date(currentDate);
   dayBefore.setDate(dayBefore.getDate() - 1);
-  const initialSunData = getSunData(dayBefore, latitude, longitude);
+  const initialSunData = getSunData(dayBefore, latitude, longitude, timezone);
   let prevHours = getSunsetDecimalHours(initialSunData, timezone);
   
   // Search from selected date (offset 0) up to 365 days forward
@@ -1002,7 +1016,7 @@ export function findUpcomingSunsetMilestones(currentDate, latitude, longitude, t
     const calendarDate = new Date(currentDate);
     calendarDate.setDate(calendarDate.getDate() + offset);
     
-    const sunData = getSunData(calendarDate, latitude, longitude);
+    const sunData = getSunData(calendarDate, latitude, longitude, timezone);
     const currHours = getSunsetDecimalHours(sunData, timezone);
     
     if (prevHours !== null && currHours !== null && sunData.sunset) {
@@ -1012,8 +1026,7 @@ export function findUpcomingSunsetMilestones(currentDate, latitude, longitude, t
       
       if (!isWrapAround) {
         // Use actual sunset date (may differ from calendar date at extreme latitudes)
-        const eventDate = new Date(sunData.sunset);
-        eventDate.setHours(0, 0, 0, 0);
+        const eventDate = calendarDateInTimezone(sunData.sunset, timezone);
         
         // Hour range to check
         const minHour = 15;
@@ -1110,8 +1123,7 @@ export function findUpcomingDSTChanges(currentDate, timezone, latitude, longitud
   // Get noon offset for the day before we start searching
   const startDate = new Date(currentDate);
   startDate.setDate(startDate.getDate() - 1);
-  let prevNoon = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), 12, 0, 0);
-  let prevNoonOffset = getTimezoneOffset(prevNoon, timezone);
+  let prevNoonOffset = getTimezoneOffset(noonOnDay(startDate, 0, timezone), timezone);
   
   // Search up to 400 days forward (to catch at least one full year)
   for (let offset = 0; offset <= 400 && transitions.length < count; offset++) {
@@ -1120,8 +1132,7 @@ export function findUpcomingDSTChanges(currentDate, timezone, latitude, longitud
     
     // Check offset at noon - safely after any early-morning DST change
     // (DST changes universally happen in early morning: 01:00-03:00)
-    const noon = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0);
-    const noonOffset = getTimezoneOffset(noon, timezone);
+    const noonOffset = getTimezoneOffset(noonOnDay(date, 0, timezone), timezone);
     
     if (prevNoonOffset !== null && noonOffset !== null && prevNoonOffset !== noonOffset) {
       // Offset changed between yesterday noon and today noon → DST changed today
@@ -1137,7 +1148,7 @@ export function findUpcomingDSTChanges(currentDate, timezone, latitude, longitud
       }
       
       // Get sunrise/sunset times for DST date
-      const sunData = getSunData(date, latitude, longitude);
+      const sunData = getSunData(date, latitude, longitude, timezone);
       const sunriseTime = formatTimeInTz(sunData.sunrise, timezone);
       const sunsetTime = formatTimeInTz(sunData.sunset, timezone);
       

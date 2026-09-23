@@ -174,7 +174,7 @@
   });
   
   // Current day's sun data (uses actual longitude for accurate times)
-  let sunData = $derived(getSunData(selectedDate, latitude, longitude));
+  let sunData = $derived(getSunData(selectedDate, latitude, longitude, timezone));
   
   // Mirror date: the date with the same amount of daylight on the other half of the year
   // Uses fixed latitude (45°) so the mirror date is consistent regardless of user location
@@ -211,7 +211,7 @@
       const yd = computeYearData(lat, year);
       // Warm getSunData cache for actual longitude (used by milestone functions)
       for (let doy = 1; doy <= yd.length; doy++) {
-        getSunData(new Date(year, 0, doy), lat, lng);
+        getSunData(new Date(year, 0, doy), lat, lng, tz);
       }
       // Warm milestone function caches
       findUpcomingSunriseMilestones(date, lat, lng, tz);
