@@ -265,14 +265,14 @@
                 {formatDurationChange(row.value).replace('-', '−')}
               </span>
               {row.text} {row.solstice.name}
-              (<button
+              <span class="whitespace-nowrap">(<button
                 type="button"
                 class="cursor-pointer hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded px-0.5 -mx-0.5"
                 onclick={() => { setHovered(null); onDateSelect?.(row.solstice.date); }}
                 onmouseenter={(e) => { setHovered(row.solstice.date); tooltipX = e.clientX; tooltipY = e.clientY; }}
                 onmousemove={(e) => { tooltipX = e.clientX; tooltipY = e.clientY; }}
                 onmouseleave={() => setHovered(null)}
-              >{formatDateShort(row.solstice.date)}</button>)
+              >{formatDateShort(row.solstice.date)}</button>)</span>
             </p>
           {/each}
         </div>
@@ -298,7 +298,7 @@
               {#each twilightPhases as phase}
                 <tr class="border-b border-gray-100 dark:border-gray-700/50">
                   <td class="py-1.5 pr-3 text-gray-900 dark:text-gray-100">
-                    <span class="mr-1.5 inline-block h-2.5 w-2.5 rounded-sm ring-1 ring-black/10 dark:ring-white/15" style="background: {phase.color}" aria-hidden="true"></span>{phase.label} <span class="text-xs text-gray-500 dark:text-gray-400">({phase.range})</span>
+                    <span class="mr-1.5 inline-block h-2.5 w-2.5 rounded-sm ring-1 ring-black/10 dark:ring-white/15" style="background: {phase.color}" aria-hidden="true"></span>{phase.label} <span class="block pl-4 text-xs text-gray-500 sm:inline sm:pl-0 dark:text-gray-400">({phase.range})</span>
                   </td>
                   {#if twilight.morning[phase.key] === 'all day'}
                     <td colspan="2" class="py-1.5 text-gray-900 dark:text-gray-100 font-medium">All day</td>
@@ -310,7 +310,7 @@
               {/each}
               <tr class="border-b border-gray-100 dark:border-gray-700/50">
                 <td class="py-1.5 pr-3 text-gray-900 dark:text-gray-100">
-                  <span class="mr-1.5 inline-block h-2.5 w-2.5 rounded-sm ring-1 ring-black/10 dark:ring-white/15" style="background: var(--color-night)" aria-hidden="true"></span>True night <span class="text-xs text-gray-500 dark:text-gray-400">(below −18°)</span>
+                  <span class="mr-1.5 inline-block h-2.5 w-2.5 rounded-sm ring-1 ring-black/10 dark:ring-white/15" style="background: var(--color-night)" aria-hidden="true"></span>True night <span class="block pl-4 text-xs text-gray-500 sm:inline sm:pl-0 dark:text-gray-400">(below −18°)</span>
                 </td>
                 <td colspan="2" class="py-1.5 text-gray-900 dark:text-gray-100 font-medium">
                   {twilight.night > 0 ? formatDuration(twilight.night) : 'None'}

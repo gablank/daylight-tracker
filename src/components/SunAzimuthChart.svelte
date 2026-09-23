@@ -14,11 +14,13 @@
     hour = 12, hoveredHour = null, hoveredDate = null, onHoverDate = null, onDateSelect = null
   } = $props();
 
-  const width = 600;
-  const height = 380;
+  // Drawing units follow the card width (within limits) so labels stay readable on phones
+  let containerWidth = $state(600);
+  let width = $derived(Math.max(340, Math.min(600, containerWidth)));
+  let height = $derived(Math.round(width * 0.63));
   const pad = { top: 16, right: 16, bottom: 34, left: 44 };
-  const plotW = width - pad.left - pad.right;
-  const plotH = height - pad.top - pad.bottom;
+  let plotW = $derived(width - pad.left - pad.right);
+  let plotH = $derived(height - pad.top - pad.bottom);
 
   let shownHour = $derived(hoveredHour ?? hour);
   const clock = (h) => `${String(Math.floor(h)).padStart(2, '0')}:${String(Math.round((h % 1) * 60)).padStart(2, '0')}`;
@@ -121,6 +123,7 @@
 
 <ChartCard id="sun-position" title="Sun at {clock(shownHour)} through the year" subtitle="Where the sun is at the same clock time on every day. The figure-eight is the analemma; clock changes split it in two." class="h-full">
   <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
+  <div bind:clientWidth={containerWidth}>
   <svg
     viewBox="0 0 {width} {height}"
     class="w-full cursor-crosshair select-none"
@@ -162,6 +165,7 @@
       <circle cx={x(selectedPoint.bearing)} cy={y(selectedPoint.altitude)} r="7" fill="var(--color-ink)" stroke="var(--color-halo)" stroke-width="3" />
     {/if}
   </svg>
+  </div>
 
   {#snippet legend()}
     <span class="flex items-center gap-1.5"><span class="inline-block h-3 w-3 rounded-full bg-gray-900 ring-2 ring-white dark:bg-white dark:ring-gray-800"></span>Selected date</span>

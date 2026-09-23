@@ -15,10 +15,12 @@
   let tooltipY = $state(0);
   let isHovering = $state(false);
 
-  const width = 600;
+  // Drawing units follow the card width (within limits) so labels stay readable on phones
+  let containerWidth = $state(600);
+  let width = $derived(Math.max(340, Math.min(600, containerWidth)));
   const height = 250;
   const padding = { top: 16, right: 84, bottom: 30, left: 40 };
-  const chartWidth = width - padding.left - padding.right;
+  let chartWidth = $derived(width - padding.left - padding.right);
   const chartHeight = height - padding.top - padding.bottom;
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const hereColor = 'var(--color-sun)';
@@ -138,14 +140,14 @@
   {/snippet}
   {#if other}
     <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions, a11y_no_noninteractive_element_interactions -->
-    <div class="cursor-crosshair" onclick={handleClick} onmousemove={handleMouseMove} onmouseleave={handleMouseLeave}>
+    <div class="cursor-crosshair" bind:clientWidth={containerWidth} onclick={handleClick} onmousemove={handleMouseMove} onmouseleave={handleMouseLeave}>
       <svg viewBox="0 0 {width} {height}" class="w-full" role="img" aria-label="Daylight through the year in {hereName} and {otherName}. Click to select a date.">
         {#each [0, 6, 12, 18, 24] as hours}
           <line x1={padding.left} y1={yScale(hours)} x2={width - padding.right} y2={yScale(hours)} stroke="currentColor" class="text-gray-300 dark:text-gray-600" stroke-opacity="0.6" stroke-dasharray="2 3" />
           <text x={padding.left - 8} y={yScale(hours) + 4} text-anchor="end" class="fill-gray-500 text-[11px] dark:fill-gray-400">{hours}h</text>
         {/each}
         {#each monthTicks as { x, label }}
-          <text x={x + chartWidth / 24} y={height - 8} text-anchor="middle" class="fill-gray-500 text-[11px] dark:fill-gray-400">{label}</text>
+          <text x={x + chartWidth / 24} y={height - 8} text-anchor="middle" class="fill-gray-500 text-[11px] dark:fill-gray-400">{width < 480 ? label[0] : label}</text>
         {/each}
         <path d={linePath(otherYear)} fill="none" stroke={otherColor} stroke-width="2.5" stroke-linejoin="round" />
         <path d={linePath(hereYear)} fill="none" stroke={hereColor} stroke-width="2.5" stroke-linejoin="round" />
