@@ -134,12 +134,6 @@
     const daysInYear = getDaysInYear(year);
     const winterSolsticeDOY = getDayOfYear(getWinterSolstice(year));
     
-    // Find min and max daylight for normalization
-    const daylights = yearData.map(d => d.daylight).filter(d => !isNaN(d));
-    const minDaylight = Math.min(...daylights);
-    const maxDaylight = Math.max(...daylights);
-    const range = maxDaylight - minDaylight;
-    
     return yearData.map((data, i) => {
       // Offset angle so winter solstice is at 0 degrees (top)
       // yearData index 0 = Jan 1 (day 1), so i+1 gives day of year
@@ -149,21 +143,13 @@
       const startAngle = (daysFromWS / daysInYear) * 360;
       const endAngle = ((daysFromWS + 1) / daysInYear) * 360;
       
-      // Calculate brightness based on actual daylight data
-      let brightness = range > 0 ? (data.daylight - minDaylight) / range : 0.5;
-      
-      // Handle polar conditions
-      if (data.isPolarDay) brightness = 1;
-      else if (data.isPolarNight) brightness = 0;
-      
-      const hue = 200 + brightness * 15;
-      const saturation = 50 + brightness * 40;
-      const lightness = 20 + brightness * 50;
-      
+      // Shade by hours of daylight on an absolute 0–24h scale (same as the calendar), so
+      // locations compare honestly: the equator is an even ring, the Arctic goes dark
       return {
         startAngle,
         endAngle,
-        color: `hsl(${hue}, ${saturation}%, ${lightness}%)`,
+        // Opaque mix with the card surface, so overlapping day slices don't show seams
+        fill: `color-mix(in srgb, var(--color-sun) ${Math.round(8 + 82 * ((data.daylightHours ?? 0) / 24))}%, var(--color-halo))`,
         data
       };
     });
@@ -271,7 +257,7 @@
   });
 </script>
 
-<ChartCard id="year-overview" title="Year overview" subtitle="The year as a wheel, starting at the winter solstice. Brighter means longer days." class="h-full">
+<ChartCard id="year-overview" title="Year overview" subtitle="The year as a wheel from the winter solstice. Brighter means more daylight." class="h-full">
   {#snippet actions()}
     <label class="flex cursor-pointer items-center gap-2">
       <input
@@ -302,7 +288,7 @@
       {#each ringSegments as segment}
         <path
           d={describeArc(segment.startAngle, segment.endAngle + 0.5, innerRadius, outerRadius)}
-          fill={segment.color}
+          style="fill: {segment.fill}"
           stroke="none"
         />
       {/each}
@@ -314,9 +300,8 @@
           y1={marker.lineStart.y}
           x2={marker.lineEnd.x}
           y2={marker.lineEnd.y}
-          stroke="white"
-          stroke-width="1"
-          opacity="0.5"
+          stroke="var(--color-halo)"
+          stroke-width="2"
         />
       {/each}
       
@@ -356,11 +341,14 @@
           <title>Select {marker.name} ({marker.dateStr})</title>
           <!-- Diamond marker -->
           <g transform="translate({marker.markerPos.x}, {marker.markerPos.y})">
-            <rect 
-              x="-6" y="-6" 
-              width="12" height="12" 
+            <!-- Solstice: filled diamond; equinox: hollow -->
+            <rect
+              x="-5" y="-5"
+              width="10" height="10"
               transform="rotate(45)"
-              class="{marker.name.includes('Solstice') ? 'fill-amber-500' : 'fill-emerald-500'}"
+              fill={marker.name.includes('Solstice') ? 'var(--color-ink)' : 'var(--color-halo)'}
+              stroke="var(--color-ink)"
+              stroke-width="2"
               rx="1"
             />
           </g>
@@ -420,25 +408,21 @@
       <!-- Hover date marker (for cross-component hover sync) -->
       {#if hoverPosition}
         <g transform="translate({hoverPosition.x}, {hoverPosition.y})">
-          <circle r="8" class="fill-white dark:fill-gray-800" opacity="0.9" />
-          <circle r="6" class="fill-blue-400 dark:fill-blue-500" opacity="0.9" />
+          <circle r="7" fill="var(--color-ink-muted)" stroke="var(--color-halo)" stroke-width="2" />
         </g>
       {/if}
       
       <!-- Opposite date marker -->
       {#if oppositePosition}
         <g transform="translate({oppositePosition.x}, {oppositePosition.y})">
-          <circle r="10" class="fill-white dark:fill-gray-800" />
-          <circle r="8" class="fill-emerald-500 dark:fill-emerald-400" />
-          <circle r="4" class="fill-white dark:fill-gray-800" />
+          <circle r="9" fill="var(--color-halo)" fill-opacity="0.85" />
+          <circle r="7" fill="none" stroke="var(--color-ink)" stroke-width="2" stroke-dasharray="3 2.5" />
         </g>
       {/if}
       
       <!-- Current date marker -->
       <g transform="translate({currentPosition.x}, {currentPosition.y})">
-        <circle r="12" class="fill-white dark:fill-gray-800" />
-        <circle r="10" class="fill-orange-600 dark:fill-orange-500" />
-        <circle r="5" class="fill-white dark:fill-gray-800" />
+        <circle r="10" fill="var(--color-ink)" stroke="var(--color-halo)" stroke-width="3" />
       </g>
       
       <!-- Center text - current date info -->
@@ -480,10 +464,10 @@
             x={center}
             y={center + 24}
             text-anchor="middle"
-            class="fill-emerald-500 dark:fill-emerald-400"
+            class="fill-gray-500 underline decoration-dotted dark:fill-gray-400"
             font-size="12"
           >
-            Mirror: {formatDateShort(oppositeDate.date)}
+            Mirror date: {formatDateShort(oppositeDate.date)}
           </text>
         </g>
       {/if}
@@ -497,21 +481,13 @@
   {/if}
 
   {#snippet legend()}
-    <div class="flex items-center gap-2">
-      <div class="w-4 h-4 rounded-full bg-orange-600 dark:bg-orange-500 border-2 border-white shadow-sm"></div>
-      <span class="text-gray-600 dark:text-gray-400">Selected date</span>
-    </div>
-    <div class="flex items-center gap-2">
-      <div class="w-4 h-4 rounded-full bg-emerald-500 dark:bg-emerald-400 border-2 border-white shadow-sm"></div>
-      <span class="text-gray-600 dark:text-gray-400">Mirror date</span>
-    </div>
-    <div class="flex items-center gap-2">
-      <div class="w-3 h-3 bg-amber-500 rotate-45 rounded-sm"></div>
-      <span class="text-gray-600 dark:text-gray-400">Solstice</span>
-    </div>
-    <div class="flex items-center gap-2">
-      <div class="w-3 h-3 bg-emerald-500 rotate-45 rounded-sm"></div>
-      <span class="text-gray-600 dark:text-gray-400">Equinox</span>
-    </div>
+    <span class="flex items-center gap-1.5">
+      <span class="inline-block h-3 w-16 rounded-sm" style="background: linear-gradient(to right, color-mix(in srgb, var(--color-sun) 8%, transparent), var(--color-sun))"></span>
+      0–24h daylight
+    </span>
+    <span class="flex items-center gap-1.5"><span class="inline-block h-3 w-3 rounded-full bg-gray-900 dark:bg-white"></span>Selected date</span>
+    <span class="flex items-center gap-1.5"><span class="inline-block h-3 w-3 rounded-full border-2 border-dashed border-gray-900 dark:border-white"></span>Mirror date</span>
+    <span class="flex items-center gap-1.5"><span class="inline-block h-2.5 w-2.5 rotate-45 rounded-[1px] bg-gray-900 dark:bg-white"></span>Solstice</span>
+    <span class="flex items-center gap-1.5"><span class="inline-block h-2.5 w-2.5 rotate-45 rounded-[1px] border-2 border-gray-900 dark:border-white"></span>Equinox</span>
   {/snippet}
 </ChartCard>

@@ -18,21 +18,22 @@ A static web application that visualizes daylight duration throughout the year f
 - **Keyboard Shortcuts**: ←/→ latitude, ↑/↓ date, L location, D date, T today, ? menu
 - **Settings Persistence**: Location and timezone are remembered between visits
 
-### Interactive Year Graph
+### Year Wheel
 - Circular visualization of the entire year's daylight
-- Winter solstice at top, summer solstice at bottom
-- Color gradient showing daylight duration (darker = less daylight)
+- Winter solstice at top, summer solstice at bottom, counter-clockwise by default
+- Shading showing hours of daylight on an absolute 0–24h scale (brighter = more daylight)
 - **Click anywhere on the ring to jump to that date**
 - Current date and mirror date markers
 - Month labels and astronomical event markers (equinoxes/solstices)
-- Toggle between clockwise and counter-clockwise direction
+- Toggle between counter-clockwise and clockwise direction
 - Hemisphere-appropriate season names (e.g., "Summer Solstice" in December for Southern Hemisphere)
 
-### Today's Sun Stats
-- Sunrise and sunset times
-- Solar noon
-- Maximum sun elevation angle
-- Special handling for polar day/night conditions
+### Daylight Through the Year
+Four charts sharing one date axis, crosshair and tooltip:
+- **Day length** through the year
+- **Change per day**: minutes gained or lost each day
+- **Sunrise and sunset** with civil, nautical and astronomical twilight bands, in local clock time
+- **Solar noon** on the clock against mean solar noon, and the equation of time
 
 ### Daylight Statistics
 - **Mirror Date**: The date with the same daylight on the opposite side of the nearest solstice
@@ -54,9 +55,6 @@ A unified table showing:
 - Sun's direction and altitude through the selected day
 - Golden hour (sun -4° to +6°) and blue hour (-6° to -4°)
 - Shadow length and direction at the selected hour
-
-### Solar Noon
-- Clock time of solar noon through the year against mean solar noon, and the equation of time
 
 ### Moon
 - Phase and illumination, moonrise/moonset, and the next new, first quarter, full and last quarter moons

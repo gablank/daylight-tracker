@@ -8,16 +8,14 @@
   import LatitudeRail from './components/LatitudeRail.svelte';
   import AppMenu from './components/AppMenu.svelte';
   import YearGraph from './components/YearGraph.svelte';
-  import DaylightChart from './components/DaylightChart.svelte';
+  import YearStack from './components/YearStack.svelte';
   import SunPathChart from './components/SunPathChart.svelte';
   import SunAzimuthChart from './components/SunAzimuthChart.svelte';
-  import TwilightChart from './components/TwilightChart.svelte';
   import WorldMap from './components/WorldMap.svelte';
   import Globe from './components/Globe.svelte';
   import SectionLink from './components/SectionLink.svelte';
   import StatsTable from './components/StatsTable.svelte';
   import UpcomingDates from './components/UpcomingDates.svelte';
-  import SolarNoonChart from './components/SolarNoonChart.svelte';
   import MoonCard from './components/MoonCard.svelte';
   import CompareCard from './components/CompareCard.svelte';
   import ChartCard from './components/ChartCard.svelte';
@@ -31,14 +29,13 @@
   const urlHasState = initParams.has('lat') || initParams.has('lon') || initParams.has('tz') || initParams.has('date');
   let soloSection = $state(initParams.get('view'));
   // A shared link shows someone else's settings — don't let it overwrite the visitor's saved ones
-  const openedFromSharedLink = urlHasState || !!soloSection;
+  const openedFromSharedLink = urlHasState || initParams.has('view');
   
   // State - Default to Oslo
   let latitude = $state(59.9);
   let longitude = $state(10.7);
   let timezone = $state('Europe/Oslo');
   let selectedDate = $state(getToday());
-  let derivativeCount = $state(1);
   // Which header popover is open: 'location', 'date', 'menu' or null
   let openPopover = $state(null);
   let mapExpanded = $state(true);
@@ -46,7 +43,7 @@
   let compareName = $state(null); // preset name of the location to compare with
   let settingsLoaded = $state(false);
   
-  // Global hover state - shared across YearGraph, DaylightChart, and other components
+  // Global hover state - shared across YearGraph, the year charts, and other components
   let globalHoveredDate = $state(null);
   // Shared hour state between SunAzimuthChart and SunPathChart
   let globalHoveredHour = $state(null);
@@ -64,7 +61,6 @@
         if (settings.latitude !== undefined) latitude = settings.latitude;
         if (settings.longitude !== undefined) longitude = settings.longitude;
         if (isValidTimezone(settings.timezone)) timezone = settings.timezone;
-        if (settings.derivativeCount !== undefined) derivativeCount = Math.max(1, Math.min(5, settings.derivativeCount));
         if (settings.mapExpanded !== undefined) mapExpanded = settings.mapExpanded;
         if (settings.mapView === 'map' || settings.mapView === 'globe') mapView = settings.mapView;
         if (typeof settings.compareName === 'string') compareName = settings.compareName;
@@ -117,7 +113,6 @@
       latitude,
       longitude,
       timezone,
-      derivativeCount,
       mapExpanded,
       mapView,
       compareName
@@ -466,54 +461,17 @@
   {/snippet}
 
   {#snippet sectionDaylight()}
-    <ChartCard id="daylight" title="Daylight throughout the year" subtitle="Day length, and when the sun rises and sets through each stage of twilight." class="h-full">
-      {#snippet actions()}
-        <label class="flex items-center gap-2">
-          <span>Derivatives</span>
-          <input
-            type="number"
-            min="1"
-            max="5"
-            value={derivativeCount}
-            oninput={(e) => {
-              const v = parseInt(e.currentTarget.value, 10);
-              if (!isNaN(v)) derivativeCount = Math.max(1, Math.min(5, v));
-            }}
-            class="w-14 rounded border border-gray-300 bg-white px-2 py-1 text-center text-gray-900 focus:outline-none focus:ring-0 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
-          />
-        </label>
-      {/snippet}
-      <div class="flex h-full min-h-0 flex-col gap-2">
-        <div class="min-h-0 flex-1">
-          <DaylightChart
-            bind:derivativeCount
-            {yearData}
-            {selectedDate}
-            {oppositeDate}
-            {latitude}
-            {longitude}
-            {timezone}
-            hoveredDate={globalHoveredDate}
-            onHoverDate={(date) => globalHoveredDate = date}
-            onDateSelect={(date) => selectedDate = date}
-          />
-        </div>
-        <div class="min-h-0 flex-1">
-          <TwilightChart
-            {yearData}
-            {selectedDate}
-            {oppositeDate}
-            {latitude}
-            {longitude}
-            {timezone}
-            {derivativeCount}
-            hoveredDate={globalHoveredDate}
-            onHoverDate={(date) => globalHoveredDate = date}
-            onDateSelect={(date) => selectedDate = date}
-          />
-        </div>
-      </div>
-    </ChartCard>
+    <YearStack
+      {yearData}
+      {selectedDate}
+      {oppositeDate}
+      {latitude}
+      {longitude}
+      {timezone}
+      hoveredDate={globalHoveredDate}
+      onHoverDate={(date) => globalHoveredDate = date}
+      onDateSelect={(date) => selectedDate = date}
+    />
   {/snippet}
 
   {#snippet sectionSunPosition()}
@@ -552,18 +510,6 @@
     <UpcomingDates {selectedDate} {yearData} {latitude} {longitude} {timezone} onDateSelect={(date) => selectedDate = date} onHoverDate={(date) => globalHoveredDate = date} />
   {/snippet}
 
-  {#snippet sectionSolarNoon()}
-    <SolarNoonChart
-      {selectedDate}
-      {latitude}
-      {longitude}
-      {timezone}
-      hoveredDate={globalHoveredDate}
-      onHoverDate={(date) => globalHoveredDate = date}
-      onDateSelect={(date) => selectedDate = date}
-    />
-  {/snippet}
-
   {#snippet sectionMoon()}
     <MoonCard {selectedDate} {latitude} {longitude} {timezone} displayHour={globalHoveredHour ?? sunAzimuthSelectedHour} onDateSelect={(date) => selectedDate = date} />
   {/snippet}
@@ -594,7 +540,8 @@
         'sun-path': sectionSunPath,
         stats: sectionStats,
         upcoming: sectionUpcoming,
-        'solar-noon': sectionSolarNoon,
+        // Solar noon is now a strip in the year chart; keep old shared links working
+        'solar-noon': sectionDaylight,
         moon: sectionMoon,
         compare: sectionCompare
       }}
@@ -616,7 +563,7 @@
         {@render sectionToday()}
 
         <Chapter id="year" title="Through the year" description="How daylight grows and shrinks, day by day.">
-          <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <div class="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
             {@render sectionYearOverview()}
             {@render sectionDaylight()}
           </div>
@@ -626,7 +573,6 @@
           <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
             {@render sectionSunPath()}
             {@render sectionSunPosition()}
-            {@render sectionSolarNoon()}
             {@render sectionMoon()}
           </div>
         </Chapter>

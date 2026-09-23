@@ -154,7 +154,7 @@
 
   <!-- The day: sun height over 24 hours, sky state underneath -->
   <div class="px-5 pb-5 sm:px-6">
-    <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions a11y_no_noninteractive_element_interactions -->
+    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions, a11y_no_noninteractive_element_interactions -->
     <div
       class="relative cursor-crosshair select-none"
       onmousemove={handleMove}
